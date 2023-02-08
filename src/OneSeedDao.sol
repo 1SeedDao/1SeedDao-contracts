@@ -12,9 +12,11 @@ contract OneSeedDaoArena is Ownable {
 
     mapping(address => bool) public isTokenSupported;
     mapping(bytes32 => address) public investAddrs;
+    uint256 public feePercent;
 
-    constructor(address _investImplAddr) {
+    constructor(address _investImplAddr, uint256 _feePercent) {
         investImplAddr = _investImplAddr;
+        feePercent = _feePercent;
     }
 
     function setSupporteds(address[] memory collateralTokens, bool[] memory _isSupporteds) external onlyOwner {
@@ -63,7 +65,11 @@ contract OneSeedDaoArena is Ownable {
                 params.key.endTs
             )
         );
-        DeploymentParams memory _deploymentParameters = DeploymentParams({arenaAddr: address(this), cip: params});
+        if (investAddrs[investKeyB32] != address(0)) {
+            revert Errors.InvestmentExists(params.name);
+        }
+        DeploymentParams memory _deploymentParameters =
+            DeploymentParams({arenaAddr: address(this), cip: params, feePercent: feePercent});
         investAddr = Clones.cloneDeterministic(investImplAddr, investKeyB32);
         IInvestInit(investAddr).initState(_deploymentParameters);
 

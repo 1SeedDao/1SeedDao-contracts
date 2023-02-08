@@ -8,6 +8,7 @@ library Errors {
     error AmountInsufficient();
     error NFTNotExists();
     error NFTNotOwner();
+    error InvestmentExists(string name);
 
     error InitTwice();
 
