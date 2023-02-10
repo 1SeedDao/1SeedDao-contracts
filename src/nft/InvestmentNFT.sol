@@ -4,20 +4,26 @@ pragma solidity ^0.8.13;
 import "./ERC721.sol";
 import "self/error/Error.sol";
 import "self/interfaces/IInvestInit.sol";
+import "self/interfaces/IInvestCollateral.sol";
 import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
+import "@oc/access/Ownable.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 
-contract InvestNFT is ERC721, IInvestInit {
+contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
     using Counters for Counters.Counter;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using EnumerableMap for EnumerableMap.UintToUintMap;
 
     Counters.Counter private _tokenIdCounter;
-
     EnumerableMap.AddressToUintMap private _infos;
-    EnumerableMap.UintToUintMap private _nftClaim;
+    mapping(uint256 => uint256) public tokenIdInfos;
+    mapping(uint256 => uint256) public tokenIdClaimedRounds;
+
+    mapping(uint256 => uint256) public collateralTokenRoundPools;
+    uint256 public round;
+
     uint256 public investTotalAmount;
     address public arenaAddr;
     address public claimTokenAddr;
@@ -25,7 +31,7 @@ contract InvestNFT is ERC721, IInvestInit {
     InvestmentKey public key;
     uint256 private _feePercent;
     bool public isInvestFailed;
-    
+
     /// @custom:oc-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -49,18 +55,19 @@ contract InvestNFT is ERC721, IInvestInit {
                 uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 100 - _feePercent, 100);
                 IERC20(key.collateralToken).transferFrom(address(this), key.financingWallet, remainInvestAmount);
 
-                // send fee to seed's pool
+                // send fee to 1seed's pool
                 IERC20(key.collateralToken).transferFrom(
                     address(this), arenaAddr, investTotalAmount - remainInvestAmount
                 );
 
+                // maybe out of gas
                 for (uint256 i = 0; i < _infos.length(); i++) {
                     (address investor, uint256 amount) = _infos.at(i);
                     uint256 tokenId = _tokenIdCounter.current();
                     _mint(investor, tokenId);
                     _tokenIdCounter.increment();
-                    _infos.remove(investor);
-                    _nftClaim.set(tokenId, amount);
+                    // _infos.remove(investor);
+                    tokenIdInfos[tokenId] = amount;
                 }
             }
         } else {
@@ -68,7 +75,23 @@ contract InvestNFT is ERC721, IInvestInit {
         }
     }
 
-    function claim(uint256[] memory ids) external {
+    function _claim(uint256 id) internal {
+        if (claimTokenAddr == address(0)) {
+            revert Errors.ZeroAddress();
+        }
+        uint256 remainClaim = 0;
+        for (uint256 i = tokenIdClaimedRounds[id]; i < round; i++) {
+            remainClaim += collateralTokenRoundPools[i];
+        }
+        tokenIdClaimedRounds[id] = round;
+        uint256 canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos[id], investTotalAmount);
+        IERC20(key.collateralToken).transferFrom(arenaAddr, msg.sender, canClaimAmount);
+    }
+
+    function claimBatch(uint256[] calldata ids) external {
+        for (uint256 i = 0; i < ids.length; i++) {
+            _claim(ids[i]);
+        }
     }
 
     function refundNFT() external callerIsUser {
@@ -103,10 +126,20 @@ contract InvestNFT is ERC721, IInvestInit {
         if (ownerOf(tokenId) == address(0)) {
             revert Errors.NFTNotExists();
         }
-        return string(abi.encodePacked(baseTokenURI, name));
+        return baseTokenURI;
     }
 
-    // function setClaimToken(address _claimTokenAddr) public onlyOwner {
-    //     claimTokenAddr = _claimTokenAddr;
-    // }
+    function setClaimToken(address _claimTokenAddr) public onlyOwner {
+        if (_claimTokenAddr == address(0)) {
+            revert Errors.ZeroAddress();
+        }
+        claimTokenAddr = _claimTokenAddr;
+    }
+
+    //@notice: 1.line distrubution 2. cliff distribution
+    //1seed must be approve the investNFT first.
+    function collateralDistribute(uint256 amount) public onlyOwner {
+        round++;
+        collateralTokenRoundPools[round] = amount;
+    }
 }

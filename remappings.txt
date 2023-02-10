@@ -1,5 +1,6 @@
 forge-std/=lib/forge-std/src/
 ds-test/=lib/forge-std/lib/ds-test/src/
 @oc/=lib/openzeppelin-contracts/contracts/
+@ocu/=lib/openzeppelin-contracts-upgradeable/contracts/
 solmate/=lib/solmate/src/
 self/=src/
