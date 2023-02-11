@@ -5,6 +5,7 @@ import "./ERC721.sol";
 import "self/error/Error.sol";
 import "self/interfaces/IInvestInit.sol";
 import "self/interfaces/IInvestCollateral.sol";
+import "self/interfaces/IWETH9.sol";
 import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
@@ -94,21 +95,35 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
         }
     }
 
-    function refundNFT() external callerIsUser {
-        if (!isInvestFailed) {
+    function refund(bool isEther) external callerIsUser {
+        uint256 refundAmount = _infos.get(msg.sender);
+        if (!isInvestFailed || refundAmount == 0) {
             revert Errors.RefundFail();
         }
-        IERC20(key.collateralToken).transferFrom(address(this), msg.sender, _infos.get(msg.sender));
+      
+        if (isEther) {
+            IWETH9(key.collateralToken).withdraw(refundAmount);
+           (bool sent, bytes memory data) = msg.sender.call{value: refundAmount}("");
+            require(sent, "failed to send Ether");
+        } else {
+            IERC20(key.collateralToken).transferFrom(address(this), msg.sender, refundAmount);
+        }
+        _infos.remove(msg.sender);
     }
 
-    function invest(uint256 investAmount) external callerIsUser {
+    function invest(uint256 investAmount) payable external callerIsUser {
         if (block.timestamp < key.startTs || block.timestamp > key.endTs) {
             revert Errors.NotActive();
         }
         if (investAmount < key.userMinInvestAmount) {
             revert Errors.Insufficient();
         }
-        IERC20(key.collateralToken).transferFrom(msg.sender, address(this), investAmount);
+        if (msg.value == investAmount) {
+            (bool sent, bytes memory data) = key.collateralToken.call{value: msg.value}("");
+            require(sent, "failed to send Ether");
+        } else {
+            IERC20(key.collateralToken).transferFrom(msg.sender, address(this), investAmount);
+        }
         investTotalAmount += investAmount;
         if (investTotalAmount > key.maxFinancingAmount) {
             revert Errors.InvestAmountOverflow();
