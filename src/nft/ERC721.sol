@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
-import "@oc/proxy/utils/Initializable.sol";
+import "@ocu/proxy/utils/Initializable.sol";
 
 abstract contract ERC721 is Initializable {
     /*//////////////////////////////////////////////////////////////
@@ -60,7 +60,7 @@ abstract contract ERC721 is Initializable {
         _disableInitializers();
     }
 
-    function erc721Init(string memory _name, string memory _symbol, string memory _baseTokenURI) public initializer {
+    function erc721Init(string memory _name, string memory _symbol, string memory _baseTokenURI) internal onlyInitializing {
         name = _name;
         symbol = _symbol;
         baseTokenURI = _baseTokenURI;
@@ -91,9 +91,7 @@ abstract contract ERC721 is Initializable {
 
         require(to != address(0), "INVALID_RECIPIENT");
 
-        require(
-            msg.sender == from || isApprovedForAll[from][msg.sender] || msg.sender == getApproved[id], "NOT_AUTHORIZED"
-        );
+        require(msg.sender == from || isApprovedForAll[from][msg.sender] || msg.sender == getApproved[id], "NOT_AUTHORIZED");
 
         // Underflow of the sender's balance is impossible because we check for
         // ownership above and the recipient's balance can't realistically overflow.
@@ -114,9 +112,7 @@ abstract contract ERC721 is Initializable {
         transferFrom(from, to, id);
 
         require(
-            to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, "")
-                    == ERC721TokenReceiver.onERC721Received.selector,
+            to.code.length == 0 || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, "") == ERC721TokenReceiver.onERC721Received.selector,
             "UNSAFE_RECIPIENT"
         );
     }
@@ -126,8 +122,7 @@ abstract contract ERC721 is Initializable {
 
         require(
             to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, data)
-                    == ERC721TokenReceiver.onERC721Received.selector,
+                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, data) == ERC721TokenReceiver.onERC721Received.selector,
             "UNSAFE_RECIPIENT"
         );
     }
@@ -187,8 +182,7 @@ abstract contract ERC721 is Initializable {
 
         require(
             to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, address(0), id, "")
-                    == ERC721TokenReceiver.onERC721Received.selector,
+                || ERC721TokenReceiver(to).onERC721Received(msg.sender, address(0), id, "") == ERC721TokenReceiver.onERC721Received.selector,
             "UNSAFE_RECIPIENT"
         );
     }
@@ -198,8 +192,7 @@ abstract contract ERC721 is Initializable {
 
         require(
             to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, address(0), id, data)
-                    == ERC721TokenReceiver.onERC721Received.selector,
+                || ERC721TokenReceiver(to).onERC721Received(msg.sender, address(0), id, data) == ERC721TokenReceiver.onERC721Received.selector,
             "UNSAFE_RECIPIENT"
         );
     }

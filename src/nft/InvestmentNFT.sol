@@ -9,13 +9,11 @@ import "self/interfaces/IWETH9.sol";
 import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
-import "@oc/access/Ownable.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 
-contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
+contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral {
     using Counters for Counters.Counter;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
-    using EnumerableMap for EnumerableMap.UintToUintMap;
 
     Counters.Counter private _tokenIdCounter;
     EnumerableMap.AddressToUintMap private _infos;
@@ -33,6 +31,9 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
     uint256 private _feePercent;
     bool public isInvestFailed;
 
+    event Investment(address investor, address token, uint256 amount);
+    event Refund(address investor, address token, uint256 amount);
+
     /// @custom:oc-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -45,30 +46,29 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
         arenaAddr = params.arenaAddr;
     }
 
-    function submitResult() external {
-        if (
-            block.timestamp > key.endTs
-                || (block.timestamp > key.startTs && investTotalAmount >= key.maxFinancingAmount)
-        ) {
+    // careful gas
+    function submitResult(uint256 _mintBatch) external {
+        if (block.timestamp > key.endTs || (block.timestamp > key.startTs && investTotalAmount >= key.maxFinancingAmount)) {
             if (investTotalAmount < key.minFinancingAmount) {
                 isInvestFailed = true;
             } else {
-                uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 100 - _feePercent, 100);
-                IERC20(key.collateralToken).transferFrom(address(this), key.financingWallet, remainInvestAmount);
-
-                // send fee to 1seed's pool
-                IERC20(key.collateralToken).transferFrom(
-                    address(this), arenaAddr, investTotalAmount - remainInvestAmount
-                );
-
-                // maybe out of gas
-                for (uint256 i = 0; i < _infos.length(); i++) {
+                uint256 l = _infos.length();
+                if (l > _mintBatch) {
+                    l = _mintBatch;
+                }
+                for (uint256 i; i < l; i++) {
                     (address investor, uint256 amount) = _infos.at(i);
                     uint256 tokenId = _tokenIdCounter.current();
                     _mint(investor, tokenId);
                     _tokenIdCounter.increment();
-                    // _infos.remove(investor);
+                    _infos.remove(investor);
                     tokenIdInfos[tokenId] = amount;
+                }
+                if (_infos.length() == 0) {
+                    uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 100 - _feePercent, 100);
+                    IERC20(key.collateralToken).transfer(key.financingWallet, remainInvestAmount);
+                    // send fee to 1seed's pool
+                    IERC20(key.collateralToken).transfer(arenaAddr, investTotalAmount - remainInvestAmount);
                 }
             }
         } else {
@@ -80,38 +80,46 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
         if (claimTokenAddr == address(0)) {
             revert Errors.ZeroAddress();
         }
-        uint256 remainClaim = 0;
-        for (uint256 i = tokenIdClaimedRounds[id]; i < round; i++) {
-            remainClaim += collateralTokenRoundPools[i];
+        if (ownerOf(id) != msg.sender) {
+            revert Errors.NFTNotOwner();
         }
+        uint256 canClaimAmount = pengdingClaim(id);
         tokenIdClaimedRounds[id] = round;
-        uint256 canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos[id], investTotalAmount);
-        IERC20(key.collateralToken).transferFrom(arenaAddr, msg.sender, canClaimAmount);
+        IERC20(claimTokenAddr).transferFrom(arenaAddr, msg.sender, canClaimAmount);
     }
 
     function claimBatch(uint256[] calldata ids) external {
-        for (uint256 i = 0; i < ids.length; i++) {
+        for (uint256 i; i < ids.length; i++) {
             _claim(ids[i]);
         }
     }
 
-    function refund(bool isEther) external callerIsUser {
+    function pengdingClaim(uint256 id) public view returns (uint256 canClaimAmount) {
+        uint256 remainClaim = 0;
+        for (uint256 i = tokenIdClaimedRounds[id]; i < round; i++) {
+            remainClaim += collateralTokenRoundPools[i];
+        }
+        canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos[id], investTotalAmount);
+    }
+
+    function refund(bool isEther) external {
         uint256 refundAmount = _infos.get(msg.sender);
         if (!isInvestFailed || refundAmount == 0) {
             revert Errors.RefundFail();
         }
-      
+
         if (isEther) {
             IWETH9(key.collateralToken).withdraw(refundAmount);
-           (bool sent, bytes memory data) = msg.sender.call{value: refundAmount}("");
+            (bool sent,) = msg.sender.call{value: refundAmount}("");
             require(sent, "failed to send Ether");
         } else {
-            IERC20(key.collateralToken).transferFrom(address(this), msg.sender, refundAmount);
+            IERC20(key.collateralToken).transfer(msg.sender, refundAmount);
         }
         _infos.remove(msg.sender);
+        emit Refund(msg.sender, key.collateralToken, refundAmount);
     }
 
-    function invest(uint256 investAmount) payable external callerIsUser {
+    function invest(uint256 investAmount) public payable {
         if (block.timestamp < key.startTs || block.timestamp > key.endTs) {
             revert Errors.NotActive();
         }
@@ -119,7 +127,7 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
             revert Errors.Insufficient();
         }
         if (msg.value == investAmount) {
-            (bool sent, bytes memory data) = key.collateralToken.call{value: msg.value}("");
+            (bool sent,) = key.collateralToken.call{value: msg.value}("");
             require(sent, "failed to send Ether");
         } else {
             IERC20(key.collateralToken).transferFrom(msg.sender, address(this), investAmount);
@@ -129,11 +137,21 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
             revert Errors.InvestAmountOverflow();
         }
 
-        _infos.set(msg.sender, _infos.get(msg.sender) + investAmount);
+        if (_infos.contains(msg.sender)) {
+            _infos.set(msg.sender, _infos.get(msg.sender) + investAmount);
+        } else {
+            _infos.set(msg.sender, investAmount);
+        }
+        emit Investment(msg.sender, key.collateralToken, investAmount);
     }
 
-    modifier callerIsUser() {
-        require(tx.origin == msg.sender, "The caller is another contract");
+    // modifier callerIsUser() {
+    //     require(tx.origin == msg.sender, "The caller is another contract");
+    //     _;
+    // }
+
+    modifier onlyArena() {
+        require(arenaAddr == msg.sender, "The caller is not a arena");
         _;
     }
 
@@ -144,17 +162,17 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral, Ownable {
         return baseTokenURI;
     }
 
-    function setClaimToken(address _claimTokenAddr) public onlyOwner {
+    function setClaimToken(address _claimTokenAddr) public onlyArena {
         if (_claimTokenAddr == address(0)) {
             revert Errors.ZeroAddress();
         }
         claimTokenAddr = _claimTokenAddr;
     }
 
-    //@notice: 1.line distrubution 2. cliff distribution
+    //1.line distrubution 2. cliff distribution
     //1seed must be approve the investNFT first.
-    function collateralDistribute(uint256 amount) public onlyOwner {
-        round++;
+    function collateralDistribute(uint256 amount) public onlyArena {
         collateralTokenRoundPools[round] = amount;
+        round++;
     }
 }

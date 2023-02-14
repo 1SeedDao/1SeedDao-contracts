@@ -55,11 +55,7 @@ contract SeedOfficialSBT is ERC1155, AccessControl, Pausable, ReentrancyGuard, E
         return keccak256(abi.encode(block.chainid, address(this), sbtIds, amounts));
     }
 
-    function mintBatch(uint256[] memory sbtIds, uint256[] memory amounts, bytes memory signature)
-        public
-        whenNotPaused
-        nonReentrant
-    {
+    function mintBatch(uint256[] memory sbtIds, uint256[] memory amounts, bytes memory signature) public whenNotPaused nonReentrant {
         bytes32 hash = ECDSA.toEthSignedMessageHash(hashMessage(sbtIds, amounts));
         require(!signatureUsed[hash], "hash used");
         require(SignatureChecker.isValidSignatureNow(validator, hash, signature), "invalid signature");
@@ -69,14 +65,12 @@ contract SeedOfficialSBT is ERC1155, AccessControl, Pausable, ReentrancyGuard, E
         signatureUsed[hash] = true;
     }
 
-    function _beforeTokenTransfer(
-        address operator,
-        address from,
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
-    ) internal override(ERC1155, ERC1155Supply) whenNotPaused onlyRole(MINTER_ROLE) {
+    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        internal
+        override(ERC1155, ERC1155Supply)
+        whenNotPaused
+        onlyRole(MINTER_ROLE)
+    {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 

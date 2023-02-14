@@ -54,12 +54,10 @@ contract TimeDistribution is Ownable {
     }
 
     // careful gas
-    function addMultiInfo(
-        address[] memory accounts,
-        uint256[] memory amounts,
-        uint256[] memory beginTsArray,
-        uint256[] memory endTsArray
-    ) public onlyOwner {
+    function addMultiInfo(address[] memory accounts, uint256[] memory amounts, uint256[] memory beginTsArray, uint256[] memory endTsArray)
+        public
+        onlyOwner
+    {
         require(accounts.length == amounts.length, "addMultiInfo:function params length not equal");
         require(accounts.length == beginTsArray.length, "addMultiInfo:function params length not equal");
         require(accounts.length == endTsArray.length, "addMultiInfo:function params length not equal");

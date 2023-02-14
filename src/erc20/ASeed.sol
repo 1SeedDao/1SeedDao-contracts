@@ -28,12 +28,7 @@ contract ASeed is ERC20, Pausable, AccessControl {
     }
 
     // SBT for ASeed Coin
-    function _beforeTokenTransfer(address from, address to, uint256 amount)
-        internal
-        override
-        whenNotPaused
-        onlyRole(MINTER_ROLE)
-    {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override whenNotPaused onlyRole(MINTER_ROLE) {
         super._beforeTokenTransfer(from, to, amount);
     }
 }

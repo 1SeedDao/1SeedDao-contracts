@@ -3,4 +3,5 @@ ds-test/=lib/forge-std/lib/ds-test/src/
 @oc/=lib/openzeppelin-contracts/contracts/
 @ocu/=lib/openzeppelin-contracts-upgradeable/contracts/
 solmate/=lib/solmate/src/
+solmate_lib=lib/solmate/lib/
 self/=src/
