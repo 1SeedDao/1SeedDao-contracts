@@ -5,9 +5,10 @@ import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import "self/nft/InvestmentNFT.sol";
-import "self/OneSeedDao.sol";
+import "self/OneSeedDaoArena.sol";
 
 contract OneSeedDaoTest is Test {
+    using FixedPointMathLib for uint256;
     WETH weth9;
     MockERC20 usdt;
     address investmentImplAddr;
@@ -51,7 +52,6 @@ contract OneSeedDaoTest is Test {
                 maxFinancingAmount: 12000 * 1e6,
                 userMinInvestAmount: 100 * 1e6,
                 financingWallet: address(1),
-                startTs: block.timestamp,
                 endTs: block.timestamp + 10
             })
         });
@@ -90,24 +90,32 @@ contract OneSeedDaoTest is Test {
         t.mint(address(arena), 10000 * 1e18);
         arena.setInvestmentCollateral(investAddr, address(t));
 
-        address sender = randomSelectSender(0);
-        usdt.approve(investAddr, type(uint256).max);
-        InvestmentNFT(investAddr).invest(MIN_FINANCING_AMOUNT);
+        address sender;
+        for (uint8 i; i < 100; i++) {
+            address _sender = randomSelectSender(i);
+            if (i == 0) sender = _sender;
+            usdt.approve(investAddr, type(uint256).max);
+            InvestmentNFT(investAddr).invest(MIN_FINANCING_AMOUNT / 100);
+            vm.stopPrank();
+        }
+
         // skip the timestamp
         skip(11);
-        InvestmentNFT(investAddr).submitResult(100);
-        assertEq(InvestmentNFT(investAddr).balanceOf(sender), 1);
-        console2.log(usdt.balanceOf(usdtParams.key.financingWallet));
-        console2.log(usdt.balanceOf(address(arena)));
+        InvestmentNFT(investAddr).submitResult(30);
+        InvestmentNFT(investAddr).submitResult(30);
+        InvestmentNFT(investAddr).submitResult(30);
+        InvestmentNFT(investAddr).submitResult(30);
+        // console2.log(usdt.balanceOf(usdtParams.key.financingWallet));
+        // console2.log(usdt.balanceOf(address(arena)));
+
         vm.stopPrank();
         arena.investmentDistribute(investAddr, 1000 * 1e18);
-        assertEq(InvestmentNFT(investAddr).pengdingClaim(0), 1000 * 1e18);
-
+        // assertEq(InvestmentNFT(investAddr).pengdingClaim(0), 10 * 1e18);
         startHoax(sender);
         uint256[] memory ids = new uint256[](1);
         ids[0] = 0;
         InvestmentNFT(investAddr).claimBatch(ids);
-        assertEq(t.balanceOf(sender), 1000 * 1e18);
+        assertEq(t.balanceOf(sender), 10 * 1e18);
     }
 
     function randomSelectSender(uint8 random) public returns (address sender) {

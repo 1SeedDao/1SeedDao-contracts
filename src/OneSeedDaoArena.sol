@@ -13,6 +13,8 @@ import "./interfaces/IInvestInit.sol";
 import "./interfaces/IInvestCollateral.sol";
 
 contract OneSeedDaoArena is Pausable, AccessControl {
+    event CreateInvestmentInstance(address investmentAddrs, string name);
+
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     mapping(bytes32 => bool) private signatureUsed;
@@ -59,7 +61,7 @@ contract OneSeedDaoArena is Pausable, AccessControl {
             revert Errors.ZeroAmount();
         }
 
-        if (params.key.startTs >= params.key.endTs) {
+        if (params.key.endTs <= block.timestamp) {
             revert Errors.SettleAgain();
         }
 
@@ -76,11 +78,8 @@ contract OneSeedDaoArena is Pausable, AccessControl {
         IInvestInit(investmentAddr).initState(_deploymentParameters);
 
         investmentAddrs[investKeyB32] = investmentAddr;
+        emit CreateInvestmentInstance(investmentAddr, params.name);
     }
-
-    // function changeInvestmentOwner(address _investmentAddr, address _newOwner) public onlyOwner {
-    //     Ownable(_investmentAddr).transferOwnership(_newOwner);
-    // }
 
     function setInvestmentCollateral(address _investmentAddr, address _claimTokenAddr) public onlyRole(DEFAULT_ADMIN_ROLE) {
         IInvestCollateral(_investmentAddr).setClaimToken(_claimTokenAddr);

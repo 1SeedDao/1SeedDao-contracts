@@ -48,7 +48,7 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral {
 
     // careful gas
     function submitResult(uint256 _mintBatch) external {
-        if (block.timestamp > key.endTs || (block.timestamp > key.startTs && investTotalAmount >= key.maxFinancingAmount)) {
+        if (block.timestamp > key.endTs || investTotalAmount >= key.maxFinancingAmount) {
             if (investTotalAmount < key.minFinancingAmount) {
                 isInvestFailed = true;
             } else {
@@ -57,14 +57,14 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral {
                     l = _mintBatch;
                 }
                 for (uint256 i; i < l; i++) {
-                    (address investor, uint256 amount) = _infos.at(i);
                     uint256 tokenId = _tokenIdCounter.current();
+                    if (tokenId >= _infos.length()) break;
+                    (address investor, uint256 amount) = _infos.at(tokenId);
                     _mint(investor, tokenId);
                     _tokenIdCounter.increment();
-                    _infos.remove(investor);
                     tokenIdInfos[tokenId] = amount;
                 }
-                if (_infos.length() == 0) {
+                if (_infos.length() == _tokenIdCounter.current()) {
                     uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 100 - _feePercent, 100);
                     IERC20(key.collateralToken).transfer(key.financingWallet, remainInvestAmount);
                     // send fee to 1seed's pool
@@ -102,6 +102,14 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral {
         canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos[id], investTotalAmount);
     }
 
+    function investmentAmount(address investor) public view returns (uint256) {
+        return _infos.get(investor);
+    }
+
+    function investorCount() public view returns (uint256) {
+        return _infos.length();
+    }
+
     function refund(bool isEther) external {
         uint256 refundAmount = _infos.get(msg.sender);
         if (!isInvestFailed || refundAmount == 0) {
@@ -120,7 +128,7 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral {
     }
 
     function invest(uint256 investAmount) public payable {
-        if (block.timestamp < key.startTs || block.timestamp > key.endTs) {
+        if (block.timestamp > key.endTs) {
             revert Errors.NotActive();
         }
         if (investAmount < key.userMinInvestAmount) {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
-import "@ocu/proxy/utils/Initializable.sol";
+import "@oc/proxy/utils/Initializable.sol";
 
 abstract contract ERC721 is Initializable {
     /*//////////////////////////////////////////////////////////////

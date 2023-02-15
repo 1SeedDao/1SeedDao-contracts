@@ -7,6 +7,5 @@ struct InvestmentKey {
     uint256 maxFinancingAmount;
     uint256 userMinInvestAmount;
     address financingWallet;
-    uint256 startTs;
     uint256 endTs;
 }
