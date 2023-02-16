@@ -18,10 +18,12 @@ contract TimeDistribution is Ownable {
 
     struct DistributionInfo {
         uint256 amount;
-        uint256 claimedAmount;
+        uint256 claimedAmount; // already claimed
         uint256 beginTs;
         uint256 endTs;
         uint256 duration;
+        bool isReward;
+        bool isLocked; // true if the account is 12 mouths' locked
     }
 
     mapping(address => DistributionInfo) public infos;
@@ -43,25 +45,26 @@ contract TimeDistribution is Ownable {
         distributor = _distributor;
     }
 
-    function addInfo(address account, uint256 amount, uint256 beginTs, uint256 endTs) public onlyOwner {
+    function addInfo(address account, uint256 amount, uint256 beginTs, uint256 endTs, bool isReward, bool isLocked) public onlyOwner {
         require(infos[account].amount == 0, "account is not a new user");
         require(amount != 0, "addInfo: amount should not 0");
         require(beginTs >= block.timestamp, "addInfo: begin too early");
         require(endTs >= block.timestamp, "addInfo: end too early");
-        infos[account] = DistributionInfo(amount, 0, beginTs, endTs, endTs.sub(beginTs));
+        infos[account] = DistributionInfo(amount, 0, beginTs, endTs, endTs.sub(beginTs), isReward, isLocked);
         emit AddInfo(account, amount, beginTs, endTs);
     }
 
     // careful gas
-    function addMultiInfo(address[] memory accounts, uint256[] memory amounts, uint256[] memory beginTsArray, uint256[] memory endTsArray)
-        public
-        onlyOwner
-    {
-        require(accounts.length == amounts.length, "addMultiInfo:function params length not equal");
-        require(accounts.length == beginTsArray.length, "addMultiInfo:function params length not equal");
-        require(accounts.length == endTsArray.length, "addMultiInfo:function params length not equal");
+    function addMultiInfo(
+        address[] memory accounts,
+        uint256[] memory amounts,
+        uint256[] memory beginTsArray,
+        uint256[] memory endTsArray,
+        bool[] memory isRewardArray,
+        bool[] memory isLockedArray
+    ) public onlyOwner {
         for (uint256 i = 0; i < accounts.length; i++) {
-            addInfo(accounts[i], amounts[i], beginTsArray[i], endTsArray[i]);
+            addInfo(accounts[i], amounts[i], beginTsArray[i], endTsArray[i], isRewardArray[i], isLockedArray[i]);
         }
     }
 
@@ -71,15 +74,40 @@ contract TimeDistribution is Ownable {
         }
         DistributionInfo storage info = infos[msg.sender];
         uint256 nowtime = Math.min(block.timestamp, info.endTs);
+        if (info.isReward) {
+            uint256 coreReward = uint256(3).mul(info.amount).div(10); // 30% amount for core reward
+            if (info.claimedAmount == 0) {
+                return coreReward;
+            }
+            return (nowtime.sub(info.beginTs)).mul(info.amount - coreReward).div(info.duration).add(coreReward).sub(info.claimedAmount);
+        }
         return (nowtime.sub(info.beginTs)).mul(info.amount).div(info.duration).sub(info.claimedAmount);
     }
 
     function claim() public {
-        uint256 claimAmount = pendingClaim();
         DistributionInfo storage info = infos[msg.sender];
+        if (!info.isLocked) {
+            _claim(info);
+        } else {
+            if (info.isReward && info.claimedAmount == 0) {
+                _claim(info);
+            } else {
+                require(unlockTime(info.beginTs) < block.timestamp, "not allow to claim");
+                _claim(info);
+            }
+        }
+    }
+
+    function _claim(DistributionInfo storage info) internal {
+        uint256 claimAmount = pendingClaim();
         info.claimedAmount = info.claimedAmount.add(claimAmount);
+        require(info.claimedAmount < info.amount, "overflow claim");
         token.transferFrom(distributor, msg.sender, claimAmount);
         emit ClaimToken(msg.sender, claimAmount);
+    }
+
+    function unlockTime(uint256 beginTs) public pure returns (uint256) {
+        return beginTs + 365 days;
     }
 
     function changeUserAdmin(address oldUser, address newUser) public onlyOwner {

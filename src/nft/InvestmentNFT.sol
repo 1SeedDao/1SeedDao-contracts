@@ -180,7 +180,6 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, DefaultOperatorFilterer, IInv
         round++;
     }
 
-
     function setApprovalForAll(address operator, bool approved) public override onlyAllowedOperatorApproval(operator) {
         super.setApprovalForAll(operator, approved);
     }

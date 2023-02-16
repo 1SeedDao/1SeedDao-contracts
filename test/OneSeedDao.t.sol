@@ -20,7 +20,7 @@ contract OneSeedDaoTest is Test {
 
     uint256 constant ETH_MINT_AMOUNT = 20000 * 1e18;
     uint256 constant ETH_MIN_FINANCING_AMOUNT = 20000 * 1e18;
-   
+
     uint256 privateKey;
     InvestmentNFT usdtNFT;
     InvestmentNFT ethNFT;
@@ -54,8 +54,8 @@ contract OneSeedDaoTest is Test {
             key: InvestmentKey({
                 collateralToken: address(usdt),
                 minFinancingAmount: MIN_FINANCING_AMOUNT,
-                maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12,10),
-                userMinInvestAmount:  MIN_FINANCING_AMOUNT.mulDivDown(1,100),
+                maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
+                userMinInvestAmount: MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
                 financingWallet: address(1),
                 endTs: block.timestamp + 10
             })
@@ -71,8 +71,8 @@ contract OneSeedDaoTest is Test {
             key: InvestmentKey({
                 collateralToken: address(weth9),
                 minFinancingAmount: ETH_MIN_FINANCING_AMOUNT,
-                maxFinancingAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(12,10),
-                userMinInvestAmount:  ETH_MIN_FINANCING_AMOUNT.mulDivDown(1,100),
+                maxFinancingAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
+                userMinInvestAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
                 financingWallet: address(2),
                 endTs: block.timestamp + 10
             })
@@ -133,10 +133,10 @@ contract OneSeedDaoTest is Test {
         uint256[] memory ids = new uint256[](1);
         ids[0] = 0;
         usdtNFT.claimBatch(ids);
-        assertEq(t.balanceOf(sender), 11.11* 1e18);
+        assertEq(t.balanceOf(sender), 11.11 * 1e18);
     }
 
-    function testETHInvestSuccessAndMintAndClaim() public{
+    function testETHInvestSuccessAndMintAndClaim() public {
         MockERC20 t = new MockERC20("TEST", "T", 18);
         t.mint(address(arena), 10000 * 1e18);
         arena.setInvestmentCollateral(address(ethNFT), address(t));
