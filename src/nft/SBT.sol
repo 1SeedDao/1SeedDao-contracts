@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.17;
 
 import "@oc/token/ERC1155/ERC1155.sol";
 import "@oc/access/AccessControl.sol";

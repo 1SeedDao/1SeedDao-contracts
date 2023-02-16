@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.17;
 
 import "./ERC721.sol";
 import "self/error/Error.sol";
@@ -10,9 +10,10 @@ import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
 import "solmate/utils/FixedPointMathLib.sol";
-import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@oc/security/ReentrancyGuard.sol";
+import {DefaultOperatorFilterer} from "ofr/DefaultOperatorFilterer.sol";
 
-contract InvestmentNFT is ERC721, ReentrancyGuard, IInvestInit, IInvestCollateral {
+contract InvestmentNFT is ERC721, ReentrancyGuard, DefaultOperatorFilterer, IInvestInit, IInvestCollateral {
     using Counters for Counters.Counter;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
 
@@ -76,7 +77,6 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, IInvestInit, IInvestCollatera
         }
     }
 
-
     function _claim(uint256 id) internal {
         if (claimTokenAddr == address(0)) {
             revert Errors.ZeroAddress();
@@ -128,7 +128,7 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, IInvestInit, IInvestCollatera
         emit Refund(msg.sender, key.collateralToken, refundAmount);
     }
 
-    function invest(uint256 investAmount) public payable {
+    function invest(uint256 investAmount) public payable nonReentrant {
         if (block.timestamp > key.endTs) {
             revert Errors.NotActive();
         }
@@ -154,11 +154,6 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, IInvestInit, IInvestCollatera
         emit Investment(msg.sender, key.collateralToken, investAmount);
     }
 
-    // modifier callerIsUser() {
-    //     require(tx.origin == msg.sender, "The caller is another contract");
-    //     _;
-    // }
-
     modifier onlyArena() {
         require(arenaAddr == msg.sender, "The caller is not a arena");
         _;
@@ -183,5 +178,30 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, IInvestInit, IInvestCollatera
     function collateralDistribute(uint256 amount) public onlyArena {
         collateralTokenRoundPools[round] = amount;
         round++;
+    }
+
+
+    function setApprovalForAll(address operator, bool approved) public override onlyAllowedOperatorApproval(operator) {
+        super.setApprovalForAll(operator, approved);
+    }
+
+    function approve(address operator, uint256 tokenId) public override onlyAllowedOperatorApproval(operator) {
+        super.approve(operator, tokenId);
+    }
+
+    function transferFrom(address from, address to, uint256 tokenId) public override onlyAllowedOperator(from) {
+        super.transferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId) public override onlyAllowedOperator(from) {
+        super.safeTransferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) public override onlyAllowedOperator(from) {
+        super.safeTransferFrom(from, to, tokenId, data);
+    }
+
+    receive() external payable virtual {
+        invest(msg.value);
     }
 }

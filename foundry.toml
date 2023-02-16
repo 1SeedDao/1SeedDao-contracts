@@ -6,6 +6,8 @@ optimizer = true
 gas_reports = ["*"]
 fs_permissions = [{ access = "read-write", path = "./"}]
 ffi = true
+solc = '0.8.17'
+
 
 [fmt]
 line_length = 150

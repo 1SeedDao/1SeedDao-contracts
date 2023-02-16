@@ -2,9 +2,8 @@
 pragma solidity >=0.8.0;
 
 import "@oc/proxy/utils/Initializable.sol";
-import {DefaultOperatorFilterer} from "ofr/DefaultOperatorFilterer.sol";
 
-abstract contract ERC721 is Initializable, DefaultOperatorFilterer {
+abstract contract ERC721 is Initializable {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
