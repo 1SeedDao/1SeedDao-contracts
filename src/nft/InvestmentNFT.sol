@@ -10,8 +10,9 @@ import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
 import "solmate/utils/FixedPointMathLib.sol";
+import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 
-contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral {
+contract InvestmentNFT is ERC721, ReentrancyGuard, IInvestInit, IInvestCollateral {
     using Counters for Counters.Counter;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
 
@@ -47,34 +48,34 @@ contract InvestmentNFT is ERC721, IInvestInit, IInvestCollateral {
     }
 
     // careful gas
-    function submitResult(uint256 _mintBatch) external {
-        if (block.timestamp > key.endTs || investTotalAmount >= key.maxFinancingAmount) {
-            if (investTotalAmount < key.minFinancingAmount) {
-                isInvestFailed = true;
-            } else {
-                uint256 l = _infos.length();
-                if (l > _mintBatch) {
-                    l = _mintBatch;
-                }
-                for (uint256 i; i < l; i++) {
-                    uint256 tokenId = _tokenIdCounter.current();
-                    if (tokenId >= _infos.length()) break;
-                    (address investor, uint256 amount) = _infos.at(tokenId);
-                    _mint(investor, tokenId);
-                    _tokenIdCounter.increment();
-                    tokenIdInfos[tokenId] = amount;
-                }
-                if (_infos.length() == _tokenIdCounter.current()) {
-                    uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 100 - _feePercent, 100);
-                    IERC20(key.collateralToken).transfer(key.financingWallet, remainInvestAmount);
-                    // send fee to 1seed's pool
-                    IERC20(key.collateralToken).transfer(arenaAddr, investTotalAmount - remainInvestAmount);
-                }
-            }
-        } else {
+    function submitResult(uint256 _mintBatch) external nonReentrant {
+        if (block.timestamp <= key.endTs && investTotalAmount < key.maxFinancingAmount) {
             revert Errors.NotNeedChange();
         }
+        if (investTotalAmount < key.minFinancingAmount) {
+            isInvestFailed = true;
+            return;
+        }
+        uint256 l = _infos.length();
+        if (l > _mintBatch) {
+            l = _mintBatch;
+        }
+        for (uint256 i; i < l; i++) {
+            uint256 tokenId = _tokenIdCounter.current();
+            if (tokenId >= _infos.length()) break;
+            (address investor, uint256 amount) = _infos.at(tokenId);
+            _safeMint(investor, tokenId);
+            _tokenIdCounter.increment();
+            tokenIdInfos[tokenId] = amount;
+        }
+        if (_infos.length() == _tokenIdCounter.current()) {
+            uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 100 - _feePercent, 100);
+            IERC20(key.collateralToken).transfer(key.financingWallet, remainInvestAmount);
+            // send fee to 1seed's pool
+            IERC20(key.collateralToken).transfer(arenaAddr, investTotalAmount - remainInvestAmount);
+        }
     }
+
 
     function _claim(uint256 id) internal {
         if (claimTokenAddr == address(0)) {

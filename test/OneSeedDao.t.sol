@@ -9,6 +9,7 @@ import "self/OneSeedDaoArena.sol";
 
 contract OneSeedDaoTest is Test {
     using FixedPointMathLib for uint256;
+
     WETH weth9;
     MockERC20 usdt;
     address investmentImplAddr;
