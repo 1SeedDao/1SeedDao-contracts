@@ -4,6 +4,7 @@ pragma solidity 0.8.17;
 import "@oc/proxy/Clones.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/utils/cryptography/SignatureChecker.sol";
+import "@oc/access/Ownable.sol";
 import "@oc/access/AccessControl.sol";
 import "@oc/security/Pausable.sol";
 import "./params/DeploymentParams.sol";
@@ -12,7 +13,7 @@ import "./error/Error.sol";
 import "./interfaces/IInvestInit.sol";
 import "./interfaces/IInvestCollateral.sol";
 
-contract OneSeedDaoArena is Pausable, AccessControl {
+contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
     event CreateInvestmentInstance(address investmentAddrs, string name);
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -73,7 +74,8 @@ contract OneSeedDaoArena is Pausable, AccessControl {
         if (investmentAddrs[investKeyB32] != address(0)) {
             revert Errors.InvestmentExists(params.name);
         }
-        DeploymentParams memory _deploymentParameters = DeploymentParams({arenaAddr: address(this), cip: params, feePercent: feePercent});
+        DeploymentParams memory _deploymentParameters =
+            DeploymentParams({arenaAddr: address(this), cip: params, feePercent: feePercent, owner: owner()});
         investmentAddr = Clones.cloneDeterministic(investmentImplAddr, investKeyB32);
         IInvestInit(investmentAddr).initState(_deploymentParameters);
 

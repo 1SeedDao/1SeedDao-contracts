@@ -7,4 +7,5 @@ struct DeploymentParams {
     address arenaAddr;
     CreateInvestmentParams cip;
     uint256 feePercent;
+    address owner;
 }

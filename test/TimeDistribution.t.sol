@@ -25,10 +25,10 @@ contract TimeDistributionTest is Test {
         address addr1 = address(2);
         address addr2 = address(3);
         address addr3 = address(4);
-        td.addInfo(addr0, supply / 100, block.timestamp, block.timestamp + 2*365 days, true, true);
-        td.addInfo(addr1, supply * 5 / 1000, block.timestamp, block.timestamp + 2*365 days, true, true);
-        td.addInfo(addr2, supply * 2 / 1000, block.timestamp, block.timestamp + 2*365 days, true, true);
-        td.addInfo(addr3, supply * 2 / 100, block.timestamp, block.timestamp + 2*365 days, true, false);
+        td.addInfo(addr0, supply / 100, block.timestamp, block.timestamp + 2 * 365 days, true, true);
+        td.addInfo(addr1, supply * 5 / 1000, block.timestamp, block.timestamp + 2 * 365 days, true, true);
+        td.addInfo(addr2, supply * 2 / 1000, block.timestamp, block.timestamp + 2 * 365 days, true, true);
+        td.addInfo(addr3, supply * 2 / 100, block.timestamp, block.timestamp + 2 * 365 days, true, false);
         skip(33);
         vm.stopPrank();
         startHoax(addr0);

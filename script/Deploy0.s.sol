@@ -9,9 +9,8 @@ import "self/nft/InvestmentNFT.sol";
 import "self/OneSeedDaoArena.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
-
-contract ManagerDeploy is Script{
-     using FixedPointMathLib for uint256;
+contract ManagerDeploy is Script {
+    using FixedPointMathLib for uint256;
 
     WETH weth9;
     MockERC20 usdt;
@@ -34,7 +33,7 @@ contract ManagerDeploy is Script{
         vm.stopBroadcast();
     }
 
-    function deploy() private{
+    function deploy() private {
         usdt = new MockERC20("USDT", "USDT", 6);
         weth9 = new WETH();
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "./ERC721.sol";
 import "self/error/Error.sol";
 import "self/interfaces/IInvestInit.sol";
 import "self/interfaces/IInvestCollateral.sol";
@@ -9,11 +8,22 @@ import "self/interfaces/IWETH9.sol";
 import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
+import "@oc/utils/Strings.sol";
+import "@oc/security/ReentrancyGuard.sol";
+import "@ocu/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@ocu/access/OwnableUpgradeable.sol";
 import "solmate/utils/FixedPointMathLib.sol";
-import {ReentrancyGuard} from "@oc/security/ReentrancyGuard.sol";
 import {DefaultOperatorFilterer} from "ofr/DefaultOperatorFilterer.sol";
 
-contract InvestmentNFT is ERC721, ReentrancyGuard, DefaultOperatorFilterer, IInvestInit, IInvestCollateral {
+contract InvestmentNFT is
+    OwnableUpgradeable,
+    ERC721EnumerableUpgradeable,
+    ReentrancyGuard,
+    DefaultOperatorFilterer,
+    IInvestInit,
+    IInvestCollateral
+{
+    using Strings for uint256;
     using Counters for Counters.Counter;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
 
@@ -32,6 +42,7 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, DefaultOperatorFilterer, IInv
     InvestmentKey public key;
     uint256 private _feePercent;
     bool public isInvestFailed;
+    string public _baseTokenURI;
 
     event Investment(address investor, address token, uint256 amount);
     event Refund(address investor, address token, uint256 amount);
@@ -42,7 +53,11 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, DefaultOperatorFilterer, IInv
     }
 
     function initState(DeploymentParams memory params) external initializer {
-        erc721Init(params.cip.name, params.cip.symbol, params.cip.baseTokenURI);
+        __ERC721_init(params.cip.name, params.cip.symbol);
+        __ERC721Enumerable_init();
+        __Ownable_init();
+        transferOwnership(params.owner);
+        _baseTokenURI = params.cip.baseTokenURI;
         key = params.cip.key;
         _feePercent = params.feePercent;
         arenaAddr = params.arenaAddr;
@@ -159,13 +174,6 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, DefaultOperatorFilterer, IInv
         _;
     }
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        if (ownerOf(tokenId) == address(0)) {
-            revert Errors.NFTNotExists();
-        }
-        return baseTokenURI;
-    }
-
     function setClaimToken(address _claimTokenAddr) public onlyArena {
         if (_claimTokenAddr == address(0)) {
             revert Errors.ZeroAddress();
@@ -180,23 +188,61 @@ contract InvestmentNFT is ERC721, ReentrancyGuard, DefaultOperatorFilterer, IInv
         round++;
     }
 
-    function setApprovalForAll(address operator, bool approved) public override onlyAllowedOperatorApproval(operator) {
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        if (ownerOf(tokenId) == address(0)) {
+            revert Errors.NFTNotExists();
+        }
+        return string(abi.encodePacked(_baseTokenURI, tokenId.toString()));
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+        internal
+        override
+    {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    function setApprovalForAll(address operator, bool approved)
+        public
+        override(ERC721Upgradeable, IERC721Upgradeable)
+        onlyAllowedOperatorApproval(operator)
+    {
         super.setApprovalForAll(operator, approved);
     }
 
-    function approve(address operator, uint256 tokenId) public override onlyAllowedOperatorApproval(operator) {
+    function approve(address operator, uint256 tokenId)
+        public
+        override(ERC721Upgradeable, IERC721Upgradeable)
+        onlyAllowedOperatorApproval(operator)
+    {
         super.approve(operator, tokenId);
     }
 
-    function transferFrom(address from, address to, uint256 tokenId) public override onlyAllowedOperator(from) {
+    function transferFrom(address from, address to, uint256 tokenId)
+        public
+        override(ERC721Upgradeable, IERC721Upgradeable)
+        onlyAllowedOperator(from)
+    {
         super.transferFrom(from, to, tokenId);
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId) public override onlyAllowedOperator(from) {
+    function safeTransferFrom(address from, address to, uint256 tokenId)
+        public
+        override(ERC721Upgradeable, IERC721Upgradeable)
+        onlyAllowedOperator(from)
+    {
         super.safeTransferFrom(from, to, tokenId);
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) public override onlyAllowedOperator(from) {
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data)
+        public
+        override(ERC721Upgradeable, IERC721Upgradeable)
+        onlyAllowedOperator(from)
+    {
         super.safeTransferFrom(from, to, tokenId, data);
     }
 
