@@ -40,12 +40,14 @@ contract InvestmentNFT is
     address public claimTokenAddr;
 
     InvestmentKey public key;
-    uint256 private _feePercent;
+    uint256 private _fee; // 1/10000
+    uint256 public endTs;
     bool public isInvestFailed;
     string public _baseTokenURI;
 
     event Investment(address investor, address token, uint256 amount);
     event Refund(address investor, address token, uint256 amount);
+    event Claim(address investor, address token, uint256 amount, uint256 tokenId);
 
     /// @custom:oc-upgrades-unsafe-allow constructor
     constructor() {
@@ -59,13 +61,14 @@ contract InvestmentNFT is
         transferOwnership(params.owner);
         _baseTokenURI = params.cip.baseTokenURI;
         key = params.cip.key;
-        _feePercent = params.feePercent;
+        endTs = key.duration + block.timestamp;
+        _fee = params.fee;
         arenaAddr = params.arenaAddr;
     }
 
     // careful gas
     function submitResult(uint256 _mintBatch) external nonReentrant {
-        if (block.timestamp <= key.endTs && investTotalAmount < key.maxFinancingAmount) {
+        if (block.timestamp <= endTs && investTotalAmount < key.maxFinancingAmount) {
             revert Errors.NotNeedChange();
         }
         if (investTotalAmount < key.minFinancingAmount) {
@@ -85,7 +88,7 @@ contract InvestmentNFT is
             tokenIdInfos[tokenId] = amount;
         }
         if (_infos.length() == _tokenIdCounter.current()) {
-            uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 100 - _feePercent, 100);
+            uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 10000 - _fee, 10000);
             IERC20(key.collateralToken).transfer(key.financingWallet, remainInvestAmount);
             // send fee to 1seed's pool
             IERC20(key.collateralToken).transfer(arenaAddr, investTotalAmount - remainInvestAmount);
@@ -102,6 +105,7 @@ contract InvestmentNFT is
         uint256 canClaimAmount = pengdingClaim(id);
         tokenIdClaimedRounds[id] = round;
         IERC20(claimTokenAddr).transferFrom(arenaAddr, msg.sender, canClaimAmount);
+        emit Claim(msg.sender, claimTokenAddr, canClaimAmount, id);
     }
 
     function claimBatch(uint256[] calldata ids) external {
@@ -144,7 +148,7 @@ contract InvestmentNFT is
     }
 
     function invest(uint256 investAmount) public payable nonReentrant {
-        if (block.timestamp > key.endTs) {
+        if (block.timestamp > endTs) {
             revert Errors.NotActive();
         }
         if (investAmount < key.userMinInvestAmount) {
@@ -199,10 +203,7 @@ contract InvestmentNFT is
         return string(abi.encodePacked(_baseTokenURI, tokenId.toString()));
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
-        internal
-        override
-    {
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
     }
 

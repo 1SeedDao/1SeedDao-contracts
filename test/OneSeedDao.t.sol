@@ -38,7 +38,7 @@ contract OneSeedDaoTest is Test {
         (address admin, uint256 _privateKey) = deriveRememberKey(mnemonic, 10000);
         privateKey = _privateKey;
 
-        arena = new OneSeedDaoArena(address(new InvestmentNFT()), 1, admin);
+        arena = new OneSeedDaoArena(address(new InvestmentNFT()), 100, admin);
         address[] memory tokens = new address[](2);
         tokens[0] = (address(weth9));
         tokens[1] = (address(usdt));
@@ -57,7 +57,7 @@ contract OneSeedDaoTest is Test {
                 maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
                 userMinInvestAmount: MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
                 financingWallet: address(1),
-                endTs: block.timestamp + 10
+                duration:10
             })
         });
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(usdtParams)));
@@ -74,7 +74,7 @@ contract OneSeedDaoTest is Test {
                 maxFinancingAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
                 userMinInvestAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
                 financingWallet: address(2),
-                endTs: block.timestamp + 10
+                duration: 10
             })
         });
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(ethParams)));

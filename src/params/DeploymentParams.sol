@@ -6,6 +6,6 @@ import "./CreateInvestmentParams.sol";
 struct DeploymentParams {
     address arenaAddr;
     CreateInvestmentParams cip;
-    uint256 feePercent;
+    uint256 fee;
     address owner;
 }

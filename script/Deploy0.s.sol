@@ -61,7 +61,7 @@ contract ManagerDeploy is Script {
                 maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
                 userMinInvestAmount: MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
                 financingWallet: admin,
-                endTs: block.timestamp + 10 days
+                duration: 10 days
             })
         });
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(usdtParams)));
@@ -78,7 +78,7 @@ contract ManagerDeploy is Script {
                 maxFinancingAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
                 userMinInvestAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
                 financingWallet: admin,
-                endTs: block.timestamp + 10 days
+                duration: 10 days
             })
         });
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(ethParams)));

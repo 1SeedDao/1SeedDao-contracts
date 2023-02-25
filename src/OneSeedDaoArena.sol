@@ -22,12 +22,12 @@ contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
     mapping(address => bool) public isTokenSupported;
     mapping(bytes32 => address) public investmentAddrs;
     address public investmentImplAddr;
-    uint256 public feePercent;
+    uint256 public fee;
     address public validator;
 
-    constructor(address _investmentImplAddr, uint256 _feePercent, address _validator) {
+    constructor(address _investmentImplAddr, uint256 _fee, address _validator) {
         investmentImplAddr = _investmentImplAddr;
-        feePercent = _feePercent;
+        fee = _fee;
         validator = _validator;
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -62,7 +62,7 @@ contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
             revert Errors.ZeroAmount();
         }
 
-        if (params.key.endTs <= block.timestamp) {
+        if (params.key.duration == 0) {
             revert Errors.SettleAgain();
         }
 
@@ -74,8 +74,7 @@ contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
         if (investmentAddrs[investKeyB32] != address(0)) {
             revert Errors.InvestmentExists(params.name);
         }
-        DeploymentParams memory _deploymentParameters =
-            DeploymentParams({arenaAddr: address(this), cip: params, feePercent: feePercent, owner: owner()});
+        DeploymentParams memory _deploymentParameters = DeploymentParams({arenaAddr: address(this), cip: params, fee: fee, owner: owner()});
         investmentAddr = Clones.cloneDeterministic(investmentImplAddr, investKeyB32);
         IInvestInit(investmentAddr).initState(_deploymentParameters);
 
@@ -108,9 +107,9 @@ contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
         _unpause();
     }
 
-    function resetArgs(address _investmentImplAddr, uint256 _feePercent, address _validator) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function resetArgs(address _investmentImplAddr, uint256 _fee, address _validator) external onlyRole(DEFAULT_ADMIN_ROLE) {
         investmentImplAddr = _investmentImplAddr;
-        feePercent = _feePercent;
+        fee = _fee;
         validator = _validator;
     }
 }
