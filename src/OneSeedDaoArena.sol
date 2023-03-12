@@ -107,7 +107,7 @@ contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
         _unpause();
     }
 
-    function resetArgs(address _investmentImplAddr, uint256 _fee, address _validator) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setArgs(address _investmentImplAddr, uint256 _fee, address _validator) external onlyRole(DEFAULT_ADMIN_ROLE) {
         investmentImplAddr = _investmentImplAddr;
         fee = _fee;
         validator = _validator;

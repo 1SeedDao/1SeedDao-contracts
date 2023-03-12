@@ -8,6 +8,7 @@ import "solmate/test/utils/mocks/MockERC20.sol";
 import "self/nft/InvestmentNFT.sol";
 import "self/OneSeedDaoArena.sol";
 import "solmate/utils/SafeTransferLib.sol";
+import "./contracts/Multicall.sol";
 
 contract ManagerDeploy is Script {
     using FixedPointMathLib for uint256;
@@ -29,11 +30,13 @@ contract ManagerDeploy is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-        deploy();
+        // deploy();
+        new Multicall0();
         vm.stopBroadcast();
     }
 
     function deploy() private {
+        MockERC20 usdc = new MockERC20("USDC", "USDC", 18);
         usdt = new MockERC20("USDT", "USDT", 6);
         weth9 = new WETH();
 
@@ -42,47 +45,49 @@ contract ManagerDeploy is Script {
         console2.log("admin addr:%s, private key:%s", admin, Strings.toHexString(privateKey));
 
         InvestmentNFT nft = new InvestmentNFT();
-        arena = new OneSeedDaoArena(address(nft), 1, admin);
-        address[] memory tokens = new address[](2);
+        arena = new OneSeedDaoArena(address(nft), 100, admin);
+        address[] memory tokens = new address[](3);
         tokens[0] = (address(weth9));
         tokens[1] = (address(usdt));
-        bool[] memory isSupporteds = new bool[](2);
+        tokens[2] = address(usdc);
+        bool[] memory isSupporteds = new bool[](3);
         isSupporteds[0] = true;
         isSupporteds[1] = true;
+        isSupporteds[2] = true;
         arena.setSupporteds(tokens, isSupporteds);
 
-        CreateInvestmentParams memory usdtParams = CreateInvestmentParams({
-            name: "Test",
-            symbol: "tt",
-            baseTokenURI: "",
-            key: InvestmentKey({
-                collateralToken: address(usdt),
-                minFinancingAmount: MIN_FINANCING_AMOUNT,
-                maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
-                userMinInvestAmount: MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
-                financingWallet: admin,
-                duration: 10 days
-            })
-        });
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(usdtParams)));
-        (address investAddr,) = arena.createInvestmentInstance(usdtParams, abi.encodePacked(r, s, v));
-        usdtNFT = InvestmentNFT(payable(investAddr));
+        // CreateInvestmentParams memory usdtParams = CreateInvestmentParams({
+        //     name: "Test",
+        //     symbol: "tt",
+        //     baseTokenURI: "",
+        //     key: InvestmentKey({
+        //         collateralToken: address(usdt),
+        //         minFinancingAmount: MIN_FINANCING_AMOUNT,
+        //         maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
+        //         userMinInvestAmount: MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
+        //         financingWallet: admin,
+        //         duration: 10 days
+        //     })
+        // });
+        // (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(usdtParams)));
+        // (address investAddr,) = arena.createInvestmentInstance(usdtParams, abi.encodePacked(r, s, v));
+        // usdtNFT = InvestmentNFT(payable(investAddr));
 
-        CreateInvestmentParams memory ethParams = CreateInvestmentParams({
-            name: "Test1",
-            symbol: "tt1",
-            baseTokenURI: "",
-            key: InvestmentKey({
-                collateralToken: address(weth9),
-                minFinancingAmount: ETH_MIN_FINANCING_AMOUNT,
-                maxFinancingAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
-                userMinInvestAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
-                financingWallet: admin,
-                duration: 10 days
-            })
-        });
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(ethParams)));
-        (address investAddr1,) = arena.createInvestmentInstance(ethParams, abi.encodePacked(r1, s1, v1));
-        console2.log("Test:%s, Test1:%s", investAddr, investAddr1);
+        // CreateInvestmentParams memory ethParams = CreateInvestmentParams({
+        //     name: "Test1",
+        //     symbol: "tt1",
+        //     baseTokenURI: "",
+        //     key: InvestmentKey({
+        //         collateralToken: address(weth9),
+        //         minFinancingAmount: ETH_MIN_FINANCING_AMOUNT,
+        //         maxFinancingAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
+        //         userMinInvestAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
+        //         financingWallet: admin,
+        //         duration: 10 days
+        //     })
+        // });
+        // (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(ethParams)));
+        // (address investAddr1,) = arena.createInvestmentInstance(ethParams, abi.encodePacked(r1, s1, v1));
+        // console2.log("Test:%s, Test1:%s", investAddr, investAddr1);
     }
 }

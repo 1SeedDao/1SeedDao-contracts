@@ -101,7 +101,7 @@ contract TimeDistribution is Ownable {
     function _claim(DistributionInfo storage info) internal {
         uint256 claimAmount = pendingClaim();
         info.claimedAmount = info.claimedAmount.add(claimAmount);
-        require(info.claimedAmount < info.amount, "overflow claim");
+        require(info.claimedAmount <= info.amount, "overflow claim");
         token.transferFrom(distributor, msg.sender, claimAmount);
         emit ClaimToken(msg.sender, claimAmount);
     }

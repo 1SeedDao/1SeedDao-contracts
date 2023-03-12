@@ -57,7 +57,7 @@ contract OneSeedDaoTest is Test {
                 maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
                 userMinInvestAmount: MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
                 financingWallet: address(1),
-                duration:10
+                duration: 10
             })
         });
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(usdtParams)));
