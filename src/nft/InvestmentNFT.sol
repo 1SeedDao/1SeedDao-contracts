@@ -13,6 +13,7 @@ import "@oc/security/ReentrancyGuard.sol";
 import "@ocu/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@ocu/access/OwnableUpgradeable.sol";
 import "solmate/utils/FixedPointMathLib.sol";
+import "solmate/utils/SafeTransferLib.sol";
 import {DefaultOperatorFilterer} from "ofr/DefaultOperatorFilterer.sol";
 
 contract InvestmentNFT is
@@ -89,9 +90,14 @@ contract InvestmentNFT is
         }
         if (_infos.length() == _tokenIdCounter.current()) {
             uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 10000 - _fee, 10000);
-            IERC20(key.collateralToken).transfer(key.financingWallet, remainInvestAmount);
-            // send fee to 1seed's pool
-            IERC20(key.collateralToken).transfer(arenaAddr, investTotalAmount - remainInvestAmount);
+            if (key.collateralToken == address(0)) {
+                SafeTransferLib.safeTransferETH(key.financingWallet, remainInvestAmount);
+                SafeTransferLib.safeTransferETH(arenaAddr,investTotalAmount - remainInvestAmount);
+            } else {
+                IERC20(key.collateralToken).transfer(key.financingWallet, remainInvestAmount);
+                // send fee to 1seed's pool
+                IERC20(key.collateralToken).transfer(arenaAddr, investTotalAmount - remainInvestAmount);
+            }
         }
     }
 
@@ -130,16 +136,14 @@ contract InvestmentNFT is
         return _infos.length();
     }
 
-    function refund(bool isEther) external {
+    function refund() external {
         uint256 refundAmount = _infos.get(msg.sender);
         if (!isInvestFailed || refundAmount == 0) {
             revert Errors.RefundFail();
         }
 
-        if (isEther) {
-            IWETH9(key.collateralToken).withdraw(refundAmount);
-            (bool sent,) = msg.sender.call{value: refundAmount}("");
-            require(sent, "failed to send Ether");
+        if (key.collateralToken == address(0)) {
+            SafeTransferLib.safeTransferETH(msg.sender,refundAmount);
         } else {
             IERC20(key.collateralToken).transfer(msg.sender, refundAmount);
         }
@@ -151,14 +155,13 @@ contract InvestmentNFT is
         if (block.timestamp > endTs) {
             revert Errors.NotActive();
         }
+        if (key.collateralToken != address(0)) {
+            IERC20(key.collateralToken).transferFrom(msg.sender, address(this), investAmount);
+        } else {
+            investAmount = msg.value;
+        }
         if (investAmount < key.userMinInvestAmount) {
             revert Errors.Insufficient();
-        }
-        if (msg.value == investAmount) {
-            (bool sent,) = key.collateralToken.call{value: msg.value}("");
-            require(sent, "failed to send Ether");
-        } else {
-            IERC20(key.collateralToken).transferFrom(msg.sender, address(this), investAmount);
         }
         investTotalAmount += investAmount;
         if (investTotalAmount > key.maxFinancingAmount) {

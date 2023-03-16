@@ -48,8 +48,8 @@ contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
         whenNotPaused
         returns (address investmentAddr, bytes32 investKeyB32)
     {
-        // collaterl address error
-        if (params.key.collateralToken == address(0) || params.key.financingWallet == address(0)) {
+        // financing address error
+        if (params.key.financingWallet == address(0)) {
             revert Errors.ZeroAddress();
         }
 
@@ -92,7 +92,11 @@ contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
     }
 
     function withdrawFee(address tokenAddr, address to, uint256 amount) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        IERC20(tokenAddr).transferFrom(address(this), to, amount);
+        if (tokenAddr == address(0)) {
+            payable(to).transfer(amount);
+        } else {
+            IERC20(tokenAddr).transfer(to, amount);
+        }
     }
 
     function InvestmentAddr(string memory name, string memory symbol, string memory baseTokenURI) public view returns (address) {
@@ -111,5 +115,8 @@ contract OneSeedDaoArena is Pausable, AccessControl, Ownable {
         investmentImplAddr = _investmentImplAddr;
         fee = _fee;
         validator = _validator;
+    }
+
+    receive() external payable virtual {
     }
 }

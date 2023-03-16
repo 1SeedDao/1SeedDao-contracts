@@ -15,6 +15,7 @@ contract ManagerDeploy is Script {
 
     WETH weth9;
     MockERC20 usdt;
+    MockERC20 usdc;
     OneSeedDaoArena arena;
     address[] public allUsers;
     uint256 constant MINT_AMOUNT = 20000 * 1e6;
@@ -30,15 +31,15 @@ contract ManagerDeploy is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-        // deploy();
-        new Multicall0();
+        deploy();
+        // new Multicall0();
         vm.stopBroadcast();
     }
 
     function deploy() private {
-        MockERC20 usdc = new MockERC20("USDC", "USDC", 18);
-        usdt = new MockERC20("USDT", "USDT", 6);
-        weth9 = new WETH();
+        usdc = MockERC20(0x0Bb2d76D24c433887a01b2BDc822ee8A73C8B886);
+        usdt = MockERC20(0x23dB9cE6eBA335E2919Db22622E13492d4422827);
+        weth9 = WETH(payable(0x287e9a38CfD2C5b6E98830d47d2f8ADB38E921F7));
 
         (address admin, uint256 _privateKey) = makeAddrAndKey("1seed");
         privateKey = _privateKey;

@@ -40,7 +40,7 @@ contract OneSeedDaoTest is Test {
 
         arena = new OneSeedDaoArena(address(new InvestmentNFT()), 100, admin);
         address[] memory tokens = new address[](2);
-        tokens[0] = (address(weth9));
+        tokens[0] = (address(0));
         tokens[1] = (address(usdt));
         bool[] memory isSupporteds = new bool[](2);
         isSupporteds[0] = true;
@@ -56,7 +56,7 @@ contract OneSeedDaoTest is Test {
                 minFinancingAmount: MIN_FINANCING_AMOUNT,
                 maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
                 userMinInvestAmount: MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
-                financingWallet: address(1),
+                financingWallet: payable(address(1)),
                 duration: 10
             })
         });
@@ -69,11 +69,11 @@ contract OneSeedDaoTest is Test {
             symbol: "tt1",
             baseTokenURI: "",
             key: InvestmentKey({
-                collateralToken: address(weth9),
+                collateralToken: address(0),
                 minFinancingAmount: ETH_MIN_FINANCING_AMOUNT,
                 maxFinancingAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
                 userMinInvestAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
-                financingWallet: address(2),
+                financingWallet: payable(address(2)),
                 duration: 10
             })
         });
@@ -89,7 +89,7 @@ contract OneSeedDaoTest is Test {
         // skip the timestamp
         skip(11);
         usdtNFT.submitResult(1);
-        usdtNFT.refund(false);
+        usdtNFT.refund();
         assertEq(MINT_AMOUNT, usdt.balanceOf(sender));
     }
 
@@ -100,7 +100,7 @@ contract OneSeedDaoTest is Test {
         // skip the timestamp
         skip(11);
         usdtNFT.submitResult(1);
-        usdtNFT.refund(false);
+        usdtNFT.refund();
     }
 
     function testUSDTInvestSuccessAndMint() public {
@@ -148,15 +148,12 @@ contract OneSeedDaoTest is Test {
             SafeTransferLib.safeTransferETH(address(ethNFT), ETH_MIN_FINANCING_AMOUNT / 100);
             vm.stopPrank();
         }
-
         // skip the timestamp
         skip(11);
         ethNFT.submitResult(30);
         ethNFT.submitResult(30);
         ethNFT.submitResult(30);
         ethNFT.submitResult(30);
-        console2.log(weth9.balanceOf(address(2)));
-        console2.log(weth9.balanceOf(address(arena)));
 
         vm.stopPrank();
         arena.investmentDistribute(address(ethNFT), 1000 * 1e18);
