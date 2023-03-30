@@ -9,7 +9,7 @@ library Errors {
     error NFTNotExists();
     error NFTNotOwner();
     error InvestmentExists(string name);
-
+    error InvestmentNotExists(address addr);
     error InitTwice();
 
     error ParamsNotMatch();

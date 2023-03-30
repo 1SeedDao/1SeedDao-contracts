@@ -4,31 +4,22 @@ pragma solidity ^0.8.17;
 import "self/error/Error.sol";
 import "self/interfaces/IInvestInit.sol";
 import "self/interfaces/IInvestCollateral.sol";
-import "self/interfaces/IWETH9.sol";
+import {IInvestActions, IInvestState} from "self/interfaces/IInvestState.sol";
+import "self/interfaces/IOneSeedDaoArena.sol";
 import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
+import "@oc/token/ERC721/IERC721.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
 import "@oc/utils/Strings.sol";
-import "@oc/security/ReentrancyGuard.sol";
-import "@ocu/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@ocu/access/OwnableUpgradeable.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "solmate/utils/SafeTransferLib.sol";
-import {DefaultOperatorFilterer} from "ofr/DefaultOperatorFilterer.sol";
 
-contract InvestmentNFT is
-    OwnableUpgradeable,
-    ERC721EnumerableUpgradeable,
-    ReentrancyGuard,
-    DefaultOperatorFilterer,
-    IInvestInit,
-    IInvestCollateral
-{
-    using Strings for uint256;
+contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestState, IInvestCollateral {
     using Counters for Counters.Counter;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
 
-    Counters.Counter private _tokenIdCounter;
+    Counters.Counter private tokenCounter;
     EnumerableMap.AddressToUintMap private _infos;
     mapping(uint256 => uint256) public tokenIdInfos;
     mapping(uint256 => uint256) public tokenIdClaimedRounds;
@@ -49,6 +40,7 @@ contract InvestmentNFT is
     event Investment(address investor, address token, uint256 amount);
     event Refund(address investor, address token, uint256 amount);
     event Claim(address investor, address token, uint256 amount, uint256 tokenId);
+    event ChangeClaimToken(address oldAddr, address newAddr);
 
     /// @custom:oc-upgrades-unsafe-allow constructor
     constructor() {
@@ -56,19 +48,19 @@ contract InvestmentNFT is
     }
 
     function initState(DeploymentParams memory params) external initializer {
-        __ERC721_init(params.cip.name, params.cip.symbol);
-        __ERC721Enumerable_init();
         __Ownable_init();
         transferOwnership(params.owner);
-        _baseTokenURI = params.cip.baseTokenURI;
         key = params.cip.key;
         endTs = key.duration + block.timestamp;
         _fee = params.fee;
         arenaAddr = params.arenaAddr;
     }
 
-    // careful gas
-    function submitResult(uint256 _mintBatch) external nonReentrant {
+    function investmentKey() external view override returns (InvestmentKey memory) {
+        return key;
+    }
+
+    function submitResult(uint256 _mintBatch) external {
         if (block.timestamp <= endTs && investTotalAmount < key.maxFinancingAmount) {
             revert Errors.NotNeedChange();
         }
@@ -81,18 +73,18 @@ contract InvestmentNFT is
             l = _mintBatch;
         }
         for (uint256 i; i < l; i++) {
-            uint256 tokenId = _tokenIdCounter.current();
-            if (tokenId >= _infos.length()) break;
-            (address investor, uint256 amount) = _infos.at(tokenId);
-            _safeMint(investor, tokenId);
-            _tokenIdCounter.increment();
+            uint256 counter = tokenCounter.current();
+            if (counter >= _infos.length()) break;
+            (address investor, uint256 amount) = _infos.at(counter);
+            uint256 tokenId = IOneSeedDaoArena(arenaAddr).safeMint(investor);
+            tokenCounter.increment();
             tokenIdInfos[tokenId] = amount;
         }
-        if (_infos.length() == _tokenIdCounter.current()) {
+        if (_infos.length() == tokenCounter.current()) {
             uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 10000 - _fee, 10000);
             if (key.collateralToken == address(0)) {
                 SafeTransferLib.safeTransferETH(key.financingWallet, remainInvestAmount);
-                SafeTransferLib.safeTransferETH(arenaAddr,investTotalAmount - remainInvestAmount);
+                SafeTransferLib.safeTransferETH(arenaAddr, investTotalAmount - remainInvestAmount);
             } else {
                 IERC20(key.collateralToken).transfer(key.financingWallet, remainInvestAmount);
                 // send fee to 1seed's pool
@@ -105,7 +97,7 @@ contract InvestmentNFT is
         if (claimTokenAddr == address(0)) {
             revert Errors.ZeroAddress();
         }
-        if (ownerOf(id) != msg.sender) {
+        if (IERC721(arenaAddr).ownerOf(id) != msg.sender) {
             revert Errors.NFTNotOwner();
         }
         uint256 canClaimAmount = pengdingClaim(id);
@@ -128,7 +120,7 @@ contract InvestmentNFT is
         canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos[id], investTotalAmount);
     }
 
-    function investmentAmount(address investor) public view returns (uint256) {
+    function investorAmount(address investor) public view returns (uint256) {
         return _infos.get(investor);
     }
 
@@ -143,7 +135,7 @@ contract InvestmentNFT is
         }
 
         if (key.collateralToken == address(0)) {
-            SafeTransferLib.safeTransferETH(msg.sender,refundAmount);
+            SafeTransferLib.safeTransferETH(msg.sender, refundAmount);
         } else {
             IERC20(key.collateralToken).transfer(msg.sender, refundAmount);
         }
@@ -151,15 +143,11 @@ contract InvestmentNFT is
         emit Refund(msg.sender, key.collateralToken, refundAmount);
     }
 
-    function invest(uint256 investAmount) public payable nonReentrant {
+    function invest(address investor, uint256 investAmount) public override onlyArena {
         if (block.timestamp > endTs) {
             revert Errors.NotActive();
         }
-        if (key.collateralToken != address(0)) {
-            IERC20(key.collateralToken).transferFrom(msg.sender, address(this), investAmount);
-        } else {
-            investAmount = msg.value;
-        }
+
         if (investAmount < key.userMinInvestAmount) {
             revert Errors.Insufficient();
         }
@@ -168,12 +156,12 @@ contract InvestmentNFT is
             revert Errors.InvestAmountOverflow();
         }
 
-        if (_infos.contains(msg.sender)) {
-            _infos.set(msg.sender, _infos.get(msg.sender) + investAmount);
+        if (_infos.contains(investor)) {
+            _infos.set(investor, _infos.get(investor) + investAmount);
         } else {
-            _infos.set(msg.sender, investAmount);
+            _infos.set(investor, investAmount);
         }
-        emit Investment(msg.sender, key.collateralToken, investAmount);
+        emit Investment(investor, key.collateralToken, investAmount);
     }
 
     modifier onlyArena() {
@@ -185,6 +173,7 @@ contract InvestmentNFT is
         if (_claimTokenAddr == address(0)) {
             revert Errors.ZeroAddress();
         }
+        emit ChangeClaimToken(claimTokenAddr, _claimTokenAddr);
         claimTokenAddr = _claimTokenAddr;
     }
 
@@ -195,62 +184,5 @@ contract InvestmentNFT is
         round++;
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        return super.supportsInterface(interfaceId);
-    }
-
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        if (ownerOf(tokenId) == address(0)) {
-            revert Errors.NFTNotExists();
-        }
-        return string(abi.encodePacked(_baseTokenURI, tokenId.toString()));
-    }
-
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
-    }
-
-    function setApprovalForAll(address operator, bool approved)
-        public
-        override(ERC721Upgradeable, IERC721Upgradeable)
-        onlyAllowedOperatorApproval(operator)
-    {
-        super.setApprovalForAll(operator, approved);
-    }
-
-    function approve(address operator, uint256 tokenId)
-        public
-        override(ERC721Upgradeable, IERC721Upgradeable)
-        onlyAllowedOperatorApproval(operator)
-    {
-        super.approve(operator, tokenId);
-    }
-
-    function transferFrom(address from, address to, uint256 tokenId)
-        public
-        override(ERC721Upgradeable, IERC721Upgradeable)
-        onlyAllowedOperator(from)
-    {
-        super.transferFrom(from, to, tokenId);
-    }
-
-    function safeTransferFrom(address from, address to, uint256 tokenId)
-        public
-        override(ERC721Upgradeable, IERC721Upgradeable)
-        onlyAllowedOperator(from)
-    {
-        super.safeTransferFrom(from, to, tokenId);
-    }
-
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data)
-        public
-        override(ERC721Upgradeable, IERC721Upgradeable)
-        onlyAllowedOperator(from)
-    {
-        super.safeTransferFrom(from, to, tokenId, data);
-    }
-
-    receive() external payable virtual {
-        invest(msg.value);
-    }
+    receive() external payable virtual {}
 }

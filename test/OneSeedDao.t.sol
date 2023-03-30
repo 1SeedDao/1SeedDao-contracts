@@ -4,7 +4,7 @@ pragma solidity 0.8.17;
 import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
-import "self/nft/InvestmentNFT.sol";
+import "self/Investment.sol";
 import "self/OneSeedDaoArena.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
@@ -22,8 +22,8 @@ contract OneSeedDaoTest is Test {
     uint256 constant ETH_MIN_FINANCING_AMOUNT = 20000 * 1e18;
 
     uint256 privateKey;
-    InvestmentNFT usdtNFT;
-    InvestmentNFT ethNFT;
+    Investment usdtInvestment;
+    Investment ethInvestment;
 
     function setUp() public {
         string memory mnemonic = "test test test test test test test test test test test junk";
@@ -38,7 +38,7 @@ contract OneSeedDaoTest is Test {
         (address admin, uint256 _privateKey) = deriveRememberKey(mnemonic, 10000);
         privateKey = _privateKey;
 
-        arena = new OneSeedDaoArena(address(new InvestmentNFT()), 100, admin);
+        arena = new OneSeedDaoArena(address(new Investment()), 100, admin);
         address[] memory tokens = new address[](2);
         tokens[0] = (address(0));
         tokens[1] = (address(usdt));
@@ -50,7 +50,6 @@ contract OneSeedDaoTest is Test {
         CreateInvestmentParams memory usdtParams = CreateInvestmentParams({
             name: "Test",
             symbol: "tt",
-            baseTokenURI: "",
             key: InvestmentKey({
                 collateralToken: address(usdt),
                 minFinancingAmount: MIN_FINANCING_AMOUNT,
@@ -62,12 +61,11 @@ contract OneSeedDaoTest is Test {
         });
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(usdtParams)));
         (address investAddr,) = arena.createInvestmentInstance(usdtParams, abi.encodePacked(r, s, v));
-        usdtNFT = InvestmentNFT(payable(investAddr));
+        usdtInvestment = Investment(payable(investAddr));
 
         CreateInvestmentParams memory ethParams = CreateInvestmentParams({
             name: "Test1",
             symbol: "tt1",
-            baseTokenURI: "",
             key: InvestmentKey({
                 collateralToken: address(0),
                 minFinancingAmount: ETH_MIN_FINANCING_AMOUNT,
@@ -79,89 +77,89 @@ contract OneSeedDaoTest is Test {
         });
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(ethParams)));
         (address investAddr1,) = arena.createInvestmentInstance(ethParams, abi.encodePacked(r1, s1, v1));
-        ethNFT = InvestmentNFT(payable(investAddr1));
+        ethInvestment = Investment(payable(investAddr1));
     }
 
     function testUSDTInvestFailAndRefund() public {
         address sender = randomSelectSender(0);
-        usdt.approve(address(usdtNFT), type(uint256).max);
-        usdtNFT.invest(1000 * 1e6);
+        usdt.approve(address(arena), type(uint256).max);
+        arena.invest(address(usdtInvestment), 1000 * 1e6);
         // skip the timestamp
         skip(11);
-        usdtNFT.submitResult(1);
-        usdtNFT.refund();
+        usdtInvestment.submitResult(1);
+        usdtInvestment.refund();
         assertEq(MINT_AMOUNT, usdt.balanceOf(sender));
     }
 
     function testFailUSDTInvestSuccessAndRefundAndClaim(uint8 random) public {
         randomSelectSender(random);
-        usdt.approve(address(usdtNFT), type(uint256).max);
-        usdtNFT.invest(MIN_FINANCING_AMOUNT);
+        usdt.approve(address(arena), type(uint256).max);
+        arena.invest(address(usdtInvestment), MIN_FINANCING_AMOUNT);
         // skip the timestamp
         skip(11);
-        usdtNFT.submitResult(1);
-        usdtNFT.refund();
+        usdtInvestment.submitResult(1);
+        usdtInvestment.refund();
     }
 
     function testUSDTInvestSuccessAndMint() public {
         MockERC20 t = new MockERC20("TEST", "T", 18);
         t.mint(address(arena), 10000 * 1e18);
-        arena.setInvestmentCollateral(address(usdtNFT), address(t));
+        arena.setInvestmentCollateral(address(usdtInvestment), address(t));
 
         address sender;
         for (uint8 i; i < 100; i++) {
             address _sender = randomSelectSender(i);
             if (i == 0) sender = _sender;
-            usdt.approve(address(usdtNFT), type(uint256).max);
-            usdtNFT.invest(MIN_FINANCING_AMOUNT / 100);
+            usdt.approve(address(arena), type(uint256).max);
+            arena.invest(address(usdtInvestment), MIN_FINANCING_AMOUNT / 100);
             vm.stopPrank();
         }
 
         // skip the timestamp
         skip(11);
-        usdtNFT.submitResult(30);
-        usdtNFT.submitResult(30);
-        usdtNFT.submitResult(30);
-        usdtNFT.submitResult(30);
+        usdtInvestment.submitResult(30);
+        usdtInvestment.submitResult(30);
+        usdtInvestment.submitResult(30);
+        usdtInvestment.submitResult(30);
         // console2.log(usdt.balanceOf(usdtParams.key.financingWallet));
         // console2.log(usdt.balanceOf(address(arena)));
 
         vm.stopPrank();
-        arena.investmentDistribute(address(usdtNFT), 1111 * 1e18);
-        // assertEq(usdtNFT.pengdingClaim(0), 10 * 1e18);
+        arena.investmentDistribute(address(usdtInvestment), 1111 * 1e18);
+        // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
         startHoax(sender);
         uint256[] memory ids = new uint256[](1);
         ids[0] = 0;
-        usdtNFT.claimBatch(ids);
+        usdtInvestment.claimBatch(ids);
         assertEq(t.balanceOf(sender), 11.11 * 1e18);
     }
 
     function testETHInvestSuccessAndMintAndClaim() public {
         MockERC20 t = new MockERC20("TEST", "T", 18);
         t.mint(address(arena), 10000 * 1e18);
-        arena.setInvestmentCollateral(address(ethNFT), address(t));
+        arena.setInvestmentCollateral(address(ethInvestment), address(t));
 
         address sender;
         for (uint8 i; i < 100; i++) {
             address _sender = randomSelectSender(i);
             if (i == 0) sender = _sender;
-            SafeTransferLib.safeTransferETH(address(ethNFT), ETH_MIN_FINANCING_AMOUNT / 100);
+            arena.invest{value: ETH_MIN_FINANCING_AMOUNT / 100}(address(ethInvestment), ETH_MIN_FINANCING_AMOUNT / 100);
             vm.stopPrank();
         }
         // skip the timestamp
         skip(11);
-        ethNFT.submitResult(30);
-        ethNFT.submitResult(30);
-        ethNFT.submitResult(30);
-        ethNFT.submitResult(30);
+        ethInvestment.submitResult(30);
+        ethInvestment.submitResult(30);
+        ethInvestment.submitResult(30);
+        ethInvestment.submitResult(30);
 
         vm.stopPrank();
-        arena.investmentDistribute(address(ethNFT), 1000 * 1e18);
-        // assertEq(usdtNFT.pengdingClaim(0), 10 * 1e18);
+        arena.investmentDistribute(address(ethInvestment), 1000 * 1e18);
+        // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
         startHoax(sender);
         uint256[] memory ids = new uint256[](1);
-        ids[0] = 0;
-        ethNFT.claimBatch(ids);
+        ids[0] = arena.tokenOfOwnerByIndex(sender, 0);
+        ethInvestment.claimBatch(ids);
         assertEq(t.balanceOf(sender), 10 * 1e18);
     }
 

@@ -6,6 +6,5 @@ import "self/types/investmentKey.sol";
 struct CreateInvestmentParams {
     string name;
     string symbol;
-    string baseTokenURI;
     InvestmentKey key;
 }
