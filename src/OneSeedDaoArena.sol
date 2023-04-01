@@ -117,7 +117,7 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
         if (!_investmentAddrs.contains(msg.sender)) {
             revert Errors.InvestmentNotExists(msg.sender);
         }
-        uint256 tokenId = _tokenIdCounter.current();
+        tokenId = _tokenIdCounter.current();
         _safeMint(investor, tokenId);
         _tokenIdCounter.increment();
     }

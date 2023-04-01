@@ -8,9 +8,8 @@ import {IInvestActions, IInvestState} from "self/interfaces/IInvestState.sol";
 import "self/interfaces/IOneSeedDaoArena.sol";
 import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
-import "@oc/token/ERC721/IERC721.sol";
+import "@oc/token/ERC721/extensions/IERC721Enumerable.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
-import "@oc/utils/Strings.sol";
 import "@ocu/access/OwnableUpgradeable.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "solmate/utils/SafeTransferLib.sol";
@@ -41,6 +40,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     event Refund(address investor, address token, uint256 amount);
     event Claim(address investor, address token, uint256 amount, uint256 tokenId);
     event ChangeClaimToken(address oldAddr, address newAddr);
+    event InvestStatus(bool isSuccessful, address financingWallet, uint256 remainInvestAmount, uint256 fee);
 
     /// @custom:oc-upgrades-unsafe-allow constructor
     constructor() {
@@ -56,16 +56,13 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         arenaAddr = params.arenaAddr;
     }
 
-    function investmentKey() external view override returns (InvestmentKey memory) {
-        return key;
-    }
-
     function submitResult(uint256 _mintBatch) external {
         if (block.timestamp <= endTs && investTotalAmount < key.maxFinancingAmount) {
             revert Errors.NotNeedChange();
         }
         if (investTotalAmount < key.minFinancingAmount) {
             isInvestFailed = true;
+            emit InvestStatus(false, key.financingWallet, 0, 0);
             return;
         }
         uint256 l = _infos.length();
@@ -90,6 +87,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
                 // send fee to 1seed's pool
                 IERC20(key.collateralToken).transfer(arenaAddr, investTotalAmount - remainInvestAmount);
             }
+            emit InvestStatus(true, key.financingWallet, remainInvestAmount, investTotalAmount - remainInvestAmount);
         }
     }
 
@@ -126,6 +124,31 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
 
     function investorCount() public view returns (uint256) {
         return _infos.length();
+    }
+
+    function tokenCount() external view returns (uint256) {
+        return tokenCounter.current();
+    }
+
+    function investmentKey() external view override returns (InvestmentKey memory) {
+        return key;
+    }
+
+    function tokenIds(address owner) external view returns (uint256[] memory ids) {
+        uint256 l = IERC721(arenaAddr).balanceOf(owner);
+        uint256[] memory allIds = new uint256[](l);
+        uint256 j;
+        for (uint256 i; i < l; i++) {
+            uint256 tokenId = IERC721Enumerable(arenaAddr).tokenOfOwnerByIndex(owner, i);
+            if (tokenIdInfos[tokenId] > 0) {
+                allIds[j] = tokenId;
+                j++;
+            }
+        }
+        ids = new uint256[](j);
+        for (uint256 i; i < j; i++) {
+            ids[i] = allIds[i];
+        }
     }
 
     function refund() external {
