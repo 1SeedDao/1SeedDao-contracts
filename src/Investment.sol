@@ -6,7 +6,6 @@ import "self/interfaces/IInvestInit.sol";
 import "self/interfaces/IInvestCollateral.sol";
 import {IInvestActions, IInvestState} from "self/interfaces/IInvestState.sol";
 import "self/interfaces/IOneSeedDaoArena.sol";
-import "@oc/utils/Counters.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/token/ERC721/extensions/IERC721Enumerable.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
@@ -15,12 +14,11 @@ import "solmate/utils/FixedPointMathLib.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
 contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestState, IInvestCollateral {
-    using Counters for Counters.Counter;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
+    using EnumerableMap for EnumerableMap.UintToUintMap;
 
-    Counters.Counter private tokenCounter;
     EnumerableMap.AddressToUintMap private _infos;
-    mapping(uint256 => uint256) public tokenIdInfos;
+    EnumerableMap.UintToUintMap private tokenIdInfos;
     mapping(uint256 => uint256) public tokenIdClaimedRounds;
 
     mapping(uint256 => uint256) public collateralTokenRoundPools;
@@ -57,7 +55,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     }
 
     function submitResult(uint256 _mintBatch) external {
-        if (block.timestamp <= endTs && investTotalAmount < key.maxFinancingAmount) {
+        if (block.timestamp <= endTs && investTotalAmount < key.maxFinancingAmount - key.userMinInvestAmount) {
             revert Errors.NotNeedChange();
         }
         if (investTotalAmount < key.minFinancingAmount) {
@@ -70,14 +68,13 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
             l = _mintBatch;
         }
         for (uint256 i; i < l; i++) {
-            uint256 counter = tokenCounter.current();
-            if (counter >= _infos.length()) break;
-            (address investor, uint256 amount) = _infos.at(counter);
+            uint256 count = tokenIdInfos.length();
+            if (count >= _infos.length()) break;
+            (address investor, uint256 amount) = _infos.at(count);
             uint256 tokenId = IOneSeedDaoArena(arenaAddr).safeMint(investor);
-            tokenCounter.increment();
-            tokenIdInfos[tokenId] = amount;
+            tokenIdInfos.set(tokenId, amount);
         }
-        if (_infos.length() == tokenCounter.current()) {
+        if (_infos.length() == tokenIdInfos.length()) {
             uint256 remainInvestAmount = FixedPointMathLib.mulDivDown(investTotalAmount, 10000 - _fee, 10000);
             if (key.collateralToken == address(0)) {
                 SafeTransferLib.safeTransferETH(key.financingWallet, remainInvestAmount);
@@ -111,14 +108,20 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     }
 
     function pengdingClaim(uint256 id) public view returns (uint256 canClaimAmount) {
+        if (!tokenIdInfos.contains(id)) {
+            revert Errors.NFTNotExists();
+        }
         uint256 remainClaim = 0;
         for (uint256 i = tokenIdClaimedRounds[id]; i < round; i++) {
             remainClaim += collateralTokenRoundPools[i];
         }
-        canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos[id], investTotalAmount);
+        canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos.get(id), investTotalAmount);
     }
 
     function investorAmount(address investor) public view returns (uint256) {
+        if (!_infos.contains(investor)) {
+            return 0;
+        }
         return _infos.get(investor);
     }
 
@@ -126,8 +129,16 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         return _infos.length();
     }
 
+    function totalTokenIds() external view returns (uint256[] memory ids) {
+        ids = new uint256[](tokenIdInfos.length());
+        for (uint256 i; i < tokenIdInfos.length(); i++) {
+            (uint256 id,) = tokenIdInfos.at(i);
+            ids[i] = id; 
+        }
+    }
+
     function tokenCount() external view returns (uint256) {
-        return tokenCounter.current();
+        return tokenIdInfos.length();
     }
 
     function investmentKey() external view override returns (InvestmentKey memory) {
@@ -140,7 +151,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         uint256 j;
         for (uint256 i; i < l; i++) {
             uint256 tokenId = IERC721Enumerable(arenaAddr).tokenOfOwnerByIndex(owner, i);
-            if (tokenIdInfos[tokenId] > 0) {
+            if (tokenIdInfos.contains(tokenId)) {
                 allIds[j] = tokenId;
                 j++;
             }

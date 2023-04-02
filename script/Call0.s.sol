@@ -28,6 +28,7 @@ contract ManagerCaller is Script {
         //     100,
         //     0x817016163775AaF0B25DF274fB4b18edB67E1F26
         // );
+        OneSeedDaoArena(payable(0x6d2E0a1eA3F817e0960571Ca5B0f32007155b6f7)).setInvestmentCollateral(0x9D5437C37565E7558CFf2fc1f28E5d8527DBB727, usdcAddr);
         // address[] memory tokens = new address[](1);
         // tokens[0] = address(0);
         // bool[] memory isSupporteds = new bool[](1);
@@ -39,9 +40,13 @@ contract ManagerCaller is Script {
 
 
 
-        Investment p = Investment(payable(0x08DB60F0185e033DF205A003917B77C4aeE55BDC));
+
+
+        // Investment p = Investment(payable(0xD2686409e3aDB7E5dB73143ef5e65e38A259c098));
         // InvestmentKey memory key = p.investmentKey();
-        // console2.log(key.collateralToken);
+        // console2.log(p.tokenIds(0x7E0E0FCc7a6688eb7706275A615E17CaE582E525).length);
+        // console2.log(p.tokenIdInfos(0));
+        // console2.log(p.investorAmount(0x7E0E0FCc7a6688eb7706275A615E17CaE582E525));
         // console2.log(key.minFinancingAmount);
         // console2.log(key.maxFinancingAmount);
         // console2.log(key.userMinInvestAmount);

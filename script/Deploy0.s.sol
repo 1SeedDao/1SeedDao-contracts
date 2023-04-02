@@ -46,7 +46,7 @@ contract ManagerDeploy is Script {
         // console2.log("admin addr:%s, private key:%s", admin, Strings.toHexString(privateKey));
 
         // Investment nft = new Investment();
-        arena = new OneSeedDaoArena(address(0x200B0A98C2fa78963A22eadBbB050020a5ACc8a8), 100, 0x817016163775AaF0B25DF274fB4b18edB67E1F26);
+        arena = new OneSeedDaoArena(address(0x7F410e7709ea8965cee4b4b084aAC01fAb2E97c1), 100, 0x817016163775AaF0B25DF274fB4b18edB67E1F26);
         address[] memory tokens = new address[](4);
         tokens[0] = (address(weth9));
         tokens[1] = (address(usdt));

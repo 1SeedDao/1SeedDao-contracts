@@ -101,7 +101,7 @@ contract OneSeedDaoTest is Test {
         usdtInvestment.refund();
     }
 
-    function testUSDTInvestSuccessAndMint() public {
+    function testUSDTAndETHInvestSuccessAndMint() public {
         MockERC20 t = new MockERC20("TEST", "T", 18);
         t.mint(address(arena), 10000 * 1e18);
         arena.setInvestmentCollateral(address(usdtInvestment), address(t));
@@ -130,7 +130,6 @@ contract OneSeedDaoTest is Test {
         arena.investmentDistribute(address(usdtInvestment), 1111 * 1e18);
         // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
         startHoax(sender);
-        console2.log(usdtInvestment.tokenIds(sender)[0]);
         usdtInvestment.claimBatch(usdtInvestment.tokenIds(sender));
         vm.stopPrank();
         assertEq(t.balanceOf(sender), 11.11 * 1e18);
@@ -139,14 +138,17 @@ contract OneSeedDaoTest is Test {
         ethInvestment.submitResult(30);
         ethInvestment.submitResult(30);
         ethInvestment.submitResult(30);
-        console2.log("balance: %s", arena.totalSupply());
         arena.investmentDistribute(address(ethInvestment), 1000 * 1e18);
         // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
 
+        address addr = randomSelectSender(20);
+        arena.transferFrom(addr, sender, ethInvestment.tokenIds(addr)[0]);
+        vm.stopPrank();
+        
         startHoax(sender);
-        console2.log(ethInvestment.tokenIds(sender).length);
+        console2.log(ethInvestment.tokenIds(sender)[1]);
         ethInvestment.claimBatch(ethInvestment.tokenIds(sender));
-        assertEq(t.balanceOf(sender), 10 * 1e18 + 11.11 * 1e18);
+        assertEq(t.balanceOf(sender), 10 * 1e18 + 11.11 * 1e18 +10 * 1e18);
         vm.stopPrank();
     }
 
