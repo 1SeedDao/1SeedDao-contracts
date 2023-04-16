@@ -7,9 +7,13 @@ import "solmate/test/utils/mocks/MockERC20.sol";
 import "self/Investment.sol";
 import "self/OneSeedDaoArena.sol";
 import "solmate/utils/SafeTransferLib.sol";
+import {NFTSVG} from "self/libs/NFTSVG.sol";
+import "self/libs/NFTDescriptor.sol";
+import "forge-std/console2.sol";
 
 contract OneSeedDaoTest is Test {
     using FixedPointMathLib for uint256;
+    using Strings for uint256;
 
     WETH weth9;
     MockERC20 usdt;
@@ -106,7 +110,6 @@ contract OneSeedDaoTest is Test {
         t.mint(address(arena), 10000 * 1e18);
         arena.setInvestmentCollateral(address(usdtInvestment), address(t));
         arena.setInvestmentCollateral(address(ethInvestment), address(t));
-        
 
         address sender;
         for (uint8 i; i < 100; i++) {
@@ -130,7 +133,8 @@ contract OneSeedDaoTest is Test {
         arena.investmentDistribute(address(usdtInvestment), 1111 * 1e18);
         // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
         startHoax(sender);
-        usdtInvestment.claimBatch(usdtInvestment.tokenIds(sender));
+        (uint256[] memory tokenIds, uint256[] memory amounts) = usdtInvestment.tokenIds(sender);
+        usdtInvestment.claimBatch(tokenIds);
         vm.stopPrank();
         assertEq(t.balanceOf(sender), 11.11 * 1e18);
 
@@ -142,17 +146,19 @@ contract OneSeedDaoTest is Test {
         // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
 
         address addr = randomSelectSender(20);
-        arena.transferFrom(addr, sender, ethInvestment.tokenIds(addr)[0]);
+        (uint256[] memory ethTokenIds, uint256[] memory ethAmounts) = ethInvestment.tokenIds(addr);
+        arena.transferFrom(addr, sender, ethTokenIds[0]);
         vm.stopPrank();
-        
+
         startHoax(sender);
-        console2.log(ethInvestment.tokenIds(sender)[1]);
-        ethInvestment.claimBatch(ethInvestment.tokenIds(sender));
-        assertEq(t.balanceOf(sender), 10 * 1e18 + 11.11 * 1e18 +10 * 1e18);
+        (uint256[] memory ethTokenIds1, uint256[] memory ethAmounts1) = ethInvestment.tokenIds(sender);
+        ethInvestment.claimBatch(ethTokenIds1);
+        assertEq(t.balanceOf(sender), 10 * 1e18 + 11.11 * 1e18 + 10 * 1e18);
         vm.stopPrank();
     }
 
     function testETHInvestSuccessAndMintAndClaim() public {
+        NFTDescriptor nftDescriptor = new NFTDescriptor(address(new NFTSVG()));
         MockERC20 t = new MockERC20("TEST", "T", 18);
         t.mint(address(arena), 10000 * 1e18);
         arena.setInvestmentCollateral(address(ethInvestment), address(t));
@@ -173,6 +179,7 @@ contract OneSeedDaoTest is Test {
 
         vm.stopPrank();
         arena.investmentDistribute(address(ethInvestment), 1000 * 1e18);
+        arena.setTokenURIAddr(address(nftDescriptor));
         // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
         startHoax(sender);
         uint256[] memory ids = new uint256[](1);
@@ -180,11 +187,20 @@ contract OneSeedDaoTest is Test {
         ethInvestment.claimBatch(ids);
         assertEq(t.balanceOf(sender), 10 * 1e18);
         vm.stopPrank();
+
+        console2.log(arena.tokenURI(ids[0]));
     }
 
     function randomSelectSender(uint8 random) public returns (address sender) {
         sender = allUsers[random % allUsers.length];
         startHoax(sender);
         usdt.mint(sender, MINT_AMOUNT);
+    }
+
+    function testHexPrefix() public {
+        NFTSVG svg = new NFTSVG();
+        NFTDescriptor descriptor = new NFTDescriptor(address(svg));
+        console2.log(address(svg));
+        console2.log(descriptor.tokenToColorHexWithFF(address(svg), 0));
     }
 }

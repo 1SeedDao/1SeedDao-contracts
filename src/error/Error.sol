@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 library Errors {
     error OnlyOwner();
-    
+
     error InsufficientCollateral();
 
     error ZeroAddress();
@@ -14,8 +14,6 @@ library Errors {
 
     error NFTNotOwner();
 
-    error InvestmentExists(string name);
-
     error InvestmentNotExists(address addr);
 
     error InitTwice();
@@ -23,6 +21,7 @@ library Errors {
     error ParamsNotMatch();
 
     error NotSupported();
+
     error NotNeedChange();
 
     error NotActive();
@@ -33,10 +32,13 @@ library Errors {
 
     error Locked();
 
-    error InitInternalAgain();
-
     error Insufficient();
+
     error ClaimFail();
+
     error RefundFail();
+
     error InvestAmountOverflow();
+
+    error OnlyEOA();
 }

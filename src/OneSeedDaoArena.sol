@@ -8,6 +8,7 @@ import "self/interfaces/IInvestInit.sol";
 import "self/interfaces/IInvestCollateral.sol";
 import {IInvestActions, IInvestState} from "self/interfaces/IInvestState.sol";
 import "self/interfaces/IOneSeedDaoArena.sol";
+import "self/interfaces/INFTDescriptor.sol";
 import "@oc/utils/Counters.sol";
 import "@oc/proxy/Clones.sol";
 import "@oc/token/ERC20/IERC20.sol";
@@ -33,11 +34,12 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
     mapping(bytes32 => bool) private signatureUsed;
     mapping(address => bool) public isTokenSupported;
     mapping(bytes32 => address) public investmentAddrs;
-    EnumerableSet.AddressSet private _investmentAddrs;
+    mapping(uint256 => address) public tokenIdInvestmentAddrs;
+    EnumerableSet.AddressSet private _investmentSet;
     address public investmentImplAddr;
     uint256 public fee; // 1/10000
     address public validator;
-    string public baseTokenURI;
+    address public tokenURIAddr;
 
     constructor(address _investmentImplAddr, uint256 _fee, address _validator) ERC721("One Seed Dao", "NFT") {
         investmentImplAddr = _investmentImplAddr;
@@ -86,21 +88,24 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
         signatureUsed[hash] = true;
         investKeyB32 = keccak256(abi.encodePacked(params.name, params.symbol));
         if (investmentAddrs[investKeyB32] != address(0)) {
-            revert Errors.InvestmentExists(params.name);
+            revert Errors.InitTwice();
         }
         DeploymentParams memory _deploymentParameters = DeploymentParams({arenaAddr: address(this), cip: params, fee: fee, owner: owner()});
         investmentAddr = Clones.cloneDeterministic(investmentImplAddr, investKeyB32);
         IInvestInit(investmentAddr).initState(_deploymentParameters);
 
-        _investmentAddrs.add(investmentAddr);
+        _investmentSet.add(investmentAddr);
         investmentAddrs[investKeyB32] = investmentAddr;
         emit CreateInvestmentInstance(investmentAddr, params.name);
     }
 
     function invest(address investmentAddr, uint256 investAmount) public payable nonReentrant whenNotPaused {
-        if (!_investmentAddrs.contains(investmentAddr)) {
+        if (!_investmentSet.contains(investmentAddr)) {
             revert Errors.InvestmentNotExists(investmentAddr);
         }
+        // if (tx.origin != msg.sender) {
+        //     revert Errors.OnlyEOA();
+        // }
         InvestmentKey memory key = IInvestState(investmentAddr).investmentKey();
         uint256 amount;
         if (key.collateralToken != address(0)) {
@@ -114,11 +119,12 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
     }
 
     function safeMint(address investor) public override nonReentrant whenNotPaused returns (uint256 tokenId) {
-        if (!_investmentAddrs.contains(msg.sender)) {
+        if (!_investmentSet.contains(msg.sender)) {
             revert Errors.InvestmentNotExists(msg.sender);
         }
         tokenId = _tokenIdCounter.current();
         _safeMint(investor, tokenId);
+        tokenIdInvestmentAddrs[tokenId] = msg.sender;
         _tokenIdCounter.increment();
     }
 
@@ -158,22 +164,30 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
     }
 
     // ERC721
-    function setBaseTokenURI(string memory _baseTokenURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        baseTokenURI = _baseTokenURI;
+    function setTokenURIAddr(address _tokenURIAddr) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        tokenURIAddr = _tokenURIAddr;
     }
 
     function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ERC721Enumerable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
+    // dynamic nft uri
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         if (ownerOf(tokenId) == address(0)) {
             revert Errors.NFTNotExists();
         }
-        return string(abi.encodePacked(baseTokenURI, tokenId.toString()));
+        address investmentAddr = tokenIdInvestmentAddrs[tokenId];
+        return INFTDescriptor(tokenURIAddr).constructTokenURI(
+            INFTDescriptor.ConstructTokenURIParams({
+                tokenId: tokenId,
+                investmentAddress: investmentAddr,
+                myShares: IInvestState(investmentAddr).myShares(tokenId)
+            })
+        );
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override whenNotPaused {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
     }
 

@@ -9,7 +9,8 @@ contract Seed is ERC20, Pausable, AccessControl {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor() ERC20("One Seed Coin", "Seed") {
+    constructor() ERC20("One Seed Coin", "1Seed") {
+        _mint(msg.sender, 10_000_000e18);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);

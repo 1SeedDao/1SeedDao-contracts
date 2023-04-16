@@ -9,6 +9,9 @@ import "self/Investment.sol";
 import "self/OneSeedDaoArena.sol";
 import "solmate/utils/SafeTransferLib.sol";
 import "./contracts/Multicall.sol";
+import "self/Profile.sol";
+import "self/libs/NFTDescriptor.sol";
+import "self/libs/NFTSVG.sol";
 
 contract ManagerDeploy is Script {
     using FixedPointMathLib for uint256;
@@ -46,51 +49,20 @@ contract ManagerDeploy is Script {
         // console2.log("admin addr:%s, private key:%s", admin, Strings.toHexString(privateKey));
 
         // Investment nft = new Investment();
-        arena = new OneSeedDaoArena(address(0x7F410e7709ea8965cee4b4b084aAC01fAb2E97c1), 100, 0x817016163775AaF0B25DF274fB4b18edB67E1F26);
-        address[] memory tokens = new address[](4);
-        tokens[0] = (address(weth9));
-        tokens[1] = (address(usdt));
-        tokens[2] = address(usdc);
-        tokens[3] = address(0);
-        bool[] memory isSupporteds = new bool[](4);
-        isSupporteds[0] = true;
-        isSupporteds[1] = true;
-        isSupporteds[2] = true;
-        isSupporteds[3] = true;
-        arena.setSupporteds(tokens, isSupporteds);
-
-        // CreateInvestmentParams memory usdtParams = CreateInvestmentParams({
-        //     name: "Test",
-        //     symbol: "tt",
-        //     baseTokenURI: "",
-        //     key: InvestmentKey({
-        //         collateralToken: address(usdt),
-        //         minFinancingAmount: MIN_FINANCING_AMOUNT,
-        //         maxFinancingAmount: MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
-        //         userMinInvestAmount: MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
-        //         financingWallet: admin,
-        //         duration: 10 days
-        //     })
-        // });
-        // (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(usdtParams)));
-        // (address investAddr,) = arena.createInvestmentInstance(usdtParams, abi.encodePacked(r, s, v));
-        // usdtNFT = Investment(payable(investAddr));
-
-        // CreateInvestmentParams memory ethParams = CreateInvestmentParams({
-        //     name: "Test1",
-        //     symbol: "tt1",
-        //     baseTokenURI: "",
-        //     key: InvestmentKey({
-        //         collateralToken: address(weth9),
-        //         minFinancingAmount: ETH_MIN_FINANCING_AMOUNT,
-        //         maxFinancingAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(12, 10),
-        //         userMinInvestAmount: ETH_MIN_FINANCING_AMOUNT.mulDivDown(1, 100),
-        //         financingWallet: admin,
-        //         duration: 10 days
-        //     })
-        // });
-        // (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(privateKey, ECDSA.toEthSignedMessageHash(arena.hashMessage(ethParams)));
-        // (address investAddr1,) = arena.createInvestmentInstance(ethParams, abi.encodePacked(r1, s1, v1));
-        // console2.log("Test:%s, Test1:%s", investAddr, investAddr1);
+        // arena = new OneSeedDaoArena(address(nft), 100, 0x817016163775AaF0B25DF274fB4b18edB67E1F26);
+        // address[] memory tokens = new address[](4);
+        // tokens[0] = (address(weth9));
+        // tokens[1] = (address(usdt));
+        // tokens[2] = address(usdc);
+        // tokens[3] = address(0);
+        // bool[] memory isSupporteds = new bool[](4);
+        // isSupporteds[0] = true;
+        // isSupporteds[1] = true;
+        // isSupporteds[2] = true;
+        // isSupporteds[3] = true;
+        // arena.setSupporteds(tokens, isSupporteds);
+        arena = OneSeedDaoArena(payable(0x87E9C188DA59E5564Da4CF67cA1AD48DB71Ab262));
+        NFTDescriptor nftDescriptor = new NFTDescriptor(address(new NFTSVG()));
+        arena.setTokenURIAddr(address(nftDescriptor));
     }
 }

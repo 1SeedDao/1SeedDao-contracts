@@ -28,7 +28,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     address public arenaAddr;
     address public claimTokenAddr;
 
-    InvestmentKey public key;
+    CreateInvestmentParams public cip;
     uint256 private _fee; // 1/10000
     uint256 public endTs;
     bool public isInvestFailed;
@@ -36,7 +36,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
 
     event Investment(address investor, address token, uint256 amount);
     event Refund(address investor, address token, uint256 amount);
-    event Claim(address investor, address token, uint256 amount, uint256 tokenId);
+    event Claim(address investor, address token, uint256 amount, uint256 tokenId, uint256 round);
     event ChangeClaimToken(address oldAddr, address newAddr);
     event InvestStatus(bool isSuccessful, address financingWallet, uint256 remainInvestAmount, uint256 fee);
 
@@ -48,17 +48,18 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function initState(DeploymentParams memory params) external initializer {
         __Ownable_init();
         transferOwnership(params.owner);
-        key = params.cip.key;
-        endTs = key.duration + block.timestamp;
+        cip = params.cip;
+        endTs = cip.key.duration + block.timestamp;
         _fee = params.fee;
         arenaAddr = params.arenaAddr;
     }
 
     function submitResult(uint256 _mintBatch) external {
-        if (block.timestamp <= endTs && investTotalAmount < key.maxFinancingAmount - key.userMinInvestAmount) {
-            revert Errors.NotNeedChange();
-        }
+        InvestmentKey memory key = cip.key;
         if (investTotalAmount < key.minFinancingAmount) {
+            if (block.timestamp <= endTs) {
+                revert Errors.NotNeedChange();
+            }
             isInvestFailed = true;
             emit InvestStatus(false, key.financingWallet, 0, 0);
             return;
@@ -96,9 +97,12 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
             revert Errors.NFTNotOwner();
         }
         uint256 canClaimAmount = pengdingClaim(id);
+        if (canClaimAmount == 0) {
+            revert Errors.ZeroAmount();
+        }
         tokenIdClaimedRounds[id] = round;
         IERC20(claimTokenAddr).transferFrom(arenaAddr, msg.sender, canClaimAmount);
-        emit Claim(msg.sender, claimTokenAddr, canClaimAmount, id);
+        emit Claim(msg.sender, claimTokenAddr, canClaimAmount, id, round);
     }
 
     function claimBatch(uint256[] calldata ids) external {
@@ -112,10 +116,14 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
             revert Errors.NFTNotExists();
         }
         uint256 remainClaim = 0;
-        for (uint256 i = tokenIdClaimedRounds[id]; i < round; i++) {
+        for (uint256 i = tokenIdClaimedRounds[id] + 1; i <= round; i++) {
             remainClaim += collateralTokenRoundPools[i];
         }
         canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos.get(id), investTotalAmount);
+    }
+
+    function claimToken() external view override returns (address) {
+        return claimTokenAddr;
     }
 
     function investorAmount(address investor) public view returns (uint256) {
@@ -129,12 +137,27 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         return _infos.length();
     }
 
+    function investmentSymbol() external view override returns (string memory) {
+        return cip.symbol;
+    }
+
+    function totalInvestment() external view override returns (uint256) {
+        return investTotalAmount;
+    }
+
     function totalTokenIds() external view returns (uint256[] memory ids) {
         ids = new uint256[](tokenIdInfos.length());
         for (uint256 i; i < tokenIdInfos.length(); i++) {
             (uint256 id,) = tokenIdInfos.at(i);
-            ids[i] = id; 
+            ids[i] = id;
         }
+    }
+
+    function myShares(uint256 tokenId) external view override returns (uint256) {
+        if (!tokenIdInfos.contains(tokenId)) {
+            revert Errors.NFTNotExists();
+        }
+        return tokenIdInfos.get(tokenId);
     }
 
     function tokenCount() external view returns (uint256) {
@@ -142,10 +165,10 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     }
 
     function investmentKey() external view override returns (InvestmentKey memory) {
-        return key;
+        return cip.key;
     }
 
-    function tokenIds(address owner) external view returns (uint256[] memory ids) {
+    function tokenIds(address owner) external view returns (uint256[] memory ids, uint256[] memory amounts) {
         uint256 l = IERC721(arenaAddr).balanceOf(owner);
         uint256[] memory allIds = new uint256[](l);
         uint256 j;
@@ -157,12 +180,19 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
             }
         }
         ids = new uint256[](j);
+        amounts = new uint256[](j);
         for (uint256 i; i < j; i++) {
             ids[i] = allIds[i];
+            amounts[i] = tokenIdInfos.get(allIds[i]);
         }
     }
 
+    function nftRound(uint256 tokenId) external view override returns (uint256) {
+        return tokenIdClaimedRounds[tokenId];
+    }
+
     function refund() external {
+        InvestmentKey memory key = cip.key;
         uint256 refundAmount = _infos.get(msg.sender);
         if (!isInvestFailed || refundAmount == 0) {
             revert Errors.RefundFail();
@@ -178,6 +208,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     }
 
     function invest(address investor, uint256 investAmount) public override onlyArena {
+        InvestmentKey memory key = cip.key;
         if (block.timestamp > endTs) {
             revert Errors.NotActive();
         }
@@ -214,8 +245,8 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     //1.line distrubution 2. cliff distribution
     //1seed must be approve the investNFT first.
     function collateralDistribute(uint256 amount) public onlyArena {
-        collateralTokenRoundPools[round] = amount;
         round++;
+        collateralTokenRoundPools[round] = amount;
     }
 
     receive() external payable virtual {}
