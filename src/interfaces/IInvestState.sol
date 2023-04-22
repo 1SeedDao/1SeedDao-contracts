@@ -15,7 +15,9 @@ interface IInvestState {
 
     function nftRound(uint256 tokenId) external view returns (uint256);
 
-    function claimToken() external view returns (address);
+    function claimToken() external view returns (address, uint256);
+
+    function remainClaimNFT(uint256 id) external view returns (uint256 claimedAmount, uint256 remainAmount);
 }
 
 interface IInvestActions {

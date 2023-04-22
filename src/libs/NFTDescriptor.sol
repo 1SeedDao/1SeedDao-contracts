@@ -22,22 +22,32 @@ contract NFTDescriptor is INFTDescriptor {
     function constructTokenURI(ConstructTokenURIParams memory params) public view override returns (string memory) {
         string memory investment = IInvestState(params.investmentAddress).investmentSymbol();
         uint256 totalInvestAmount = IInvestState(params.investmentAddress).totalInvestment();
-        address claimTokenAddress = IInvestState(params.investmentAddress).claimToken();
+        (address claimTokenAddress, uint256 totalClaimAmount) = IInvestState(params.investmentAddress).claimToken();
         address collateralTokenAddress = IInvestState(params.investmentAddress).investmentKey().collateralToken;
         string memory name = generateName(params.tokenId.toString());
-        string memory mySharesStr = formatBalance(params.myShares, collateralTokenAddress);
-        string memory totalInvestAmountStr = formatBalance(totalInvestAmount, collateralTokenAddress);
-
-        string memory descriptionPartOne = generateDescriptionPartOne(mySharesStr, totalInvestAmountStr, addressToString(params.investmentAddress));
+        string memory mySharesStr = "";
+        string memory totalAmountStr = "";
+        if (claimTokenAddress == address(0)) {
+            mySharesStr = formatBalance(params.myShares, collateralTokenAddress);
+            totalAmountStr = formatBalance(totalInvestAmount, collateralTokenAddress);
+        } else {
+            (uint256 claimedAmount, uint256 remainAmount) = IInvestState(params.investmentAddress).remainClaimNFT(params.tokenId);
+            mySharesStr = string(
+                abi.encodePacked(formatBalance(claimedAmount, claimTokenAddress), "/", formatBalance(claimedAmount + remainAmount, claimTokenAddress))
+            );
+            totalAmountStr = formatBalance(totalClaimAmount, claimTokenAddress);
+        }
+        string memory descriptionPartOne = generateDescriptionPartOne(mySharesStr, totalAmountStr, addressToString(params.investmentAddress));
         string memory descriptionPartTwo = generateDescriptionPartTwo(
-            params.tokenId.toString(), mySharesStr, addressToString(collateralTokenAddress), addressToString(params.investmentAddress)
+            params.tokenId.toString(), mySharesStr, addressToString(collateralTokenAddress), addressToString(claimTokenAddress)
         );
         INFTSVG.SVGParams memory svgParams = INFTSVG.SVGParams({
             tokenId: params.tokenId.toString(),
-            totalInvestAmountStr: totalInvestAmountStr,
+            totalAmountStr: totalAmountStr,
             mySharesStr: mySharesStr,
             investment: investment,
             investmentAddress: params.investmentAddress,
+            claimTokenAddress: claimTokenAddress,
             color1: tokenToColorHex(claimTokenAddress, 0),
             color2: tokenToColorHexWithFF(params.investmentAddress, 136),
             color3: tokenToColorHexWithFF(collateralTokenAddress, 136)
@@ -88,12 +98,12 @@ contract NFTDescriptor is INFTDescriptor {
         string memory tokenId,
         string memory myShares,
         string memory collateralTokenAddress,
-        string memory investmentAddress
+        string memory claimTokenAddress
     ) private pure returns (string memory) {
         return string(
             abi.encodePacked(
-                " Address: ",
-                investmentAddress,
+                " Claim Address: ",
+                claimTokenAddress,
                 "\\n",
                 " Collateral Address: ",
                 collateralTokenAddress,

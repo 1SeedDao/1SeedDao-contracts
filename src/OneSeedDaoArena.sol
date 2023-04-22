@@ -128,9 +128,12 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
         _tokenIdCounter.increment();
     }
 
-    function setInvestmentCollateral(address _investmentAddr, address _claimTokenAddr) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        IInvestCollateral(_investmentAddr).setClaimToken(_claimTokenAddr);
-        IERC20(_claimTokenAddr).approve(_investmentAddr, type(uint256).max);
+    function setInvestmentCollateral(address _investmentAddr, address _claimTokenAddr, uint256 totalClaimAmount)
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        IInvestCollateral(_investmentAddr).setClaimToken(_claimTokenAddr, totalClaimAmount);
+        IERC20(_claimTokenAddr).approve(_investmentAddr, totalClaimAmount);
     }
 
     function investmentDistribute(address _investmentAddr, uint256 amount) public onlyRole(DEFAULT_ADMIN_ROLE) {

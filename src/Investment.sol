@@ -22,11 +22,13 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     mapping(uint256 => uint256) public tokenIdClaimedRounds;
 
     mapping(uint256 => uint256) public collateralTokenRoundPools;
+    mapping(uint256 => uint256) public claimedTokenAmounts;
     uint256 public round;
 
     uint256 public investTotalAmount;
     address public arenaAddr;
     address public claimTokenAddr;
+    uint256 public totalClaimAmount;
 
     CreateInvestmentParams public cip;
     uint256 private _fee; // 1/10000
@@ -59,10 +61,11 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         if (investTotalAmount < key.minFinancingAmount) {
             if (block.timestamp <= endTs) {
                 revert Errors.NotNeedChange();
+            } else {
+                isInvestFailed = true;
+                emit InvestStatus(false, key.financingWallet, 0, 0);
+                return;
             }
-            isInvestFailed = true;
-            emit InvestStatus(false, key.financingWallet, 0, 0);
-            return;
         }
         uint256 l = _infos.length();
         if (l > _mintBatch) {
@@ -96,11 +99,12 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         if (IERC721(arenaAddr).ownerOf(id) != msg.sender) {
             revert Errors.NFTNotOwner();
         }
-        uint256 canClaimAmount = pengdingClaim(id);
+        uint256 canClaimAmount = pendingClaim(id);
         if (canClaimAmount == 0) {
             revert Errors.ZeroAmount();
         }
         tokenIdClaimedRounds[id] = round;
+        claimedTokenAmounts[id] += canClaimAmount;
         IERC20(claimTokenAddr).transferFrom(arenaAddr, msg.sender, canClaimAmount);
         emit Claim(msg.sender, claimTokenAddr, canClaimAmount, id, round);
     }
@@ -111,7 +115,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         }
     }
 
-    function pengdingClaim(uint256 id) public view returns (uint256 canClaimAmount) {
+    function pendingClaim(uint256 id) public view returns (uint256 canClaimAmount) {
         if (!tokenIdInfos.contains(id)) {
             revert Errors.NFTNotExists();
         }
@@ -122,8 +126,16 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         canClaimAmount = FixedPointMathLib.mulDivDown(remainClaim, tokenIdInfos.get(id), investTotalAmount);
     }
 
-    function claimToken() external view override returns (address) {
-        return claimTokenAddr;
+    function remainClaimNFT(uint256 id) public view override returns (uint256 claimedAmount, uint256 remainAmount) {
+        if (!tokenIdInfos.contains(id)) {
+            revert Errors.NFTNotExists();
+        }
+        claimedAmount = claimedTokenAmounts[id];
+        remainAmount = FixedPointMathLib.mulDivDown(totalClaimAmount, tokenIdInfos.get(id), investTotalAmount) - claimedAmount;
+    }
+
+    function claimToken() external view override returns (address, uint256) {
+        return (claimTokenAddr, totalClaimAmount);
     }
 
     function investorAmount(address investor) public view returns (uint256) {
@@ -209,13 +221,14 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
 
     function invest(address investor, uint256 investAmount) public override onlyArena {
         InvestmentKey memory key = cip.key;
-        if (block.timestamp > endTs) {
+        if (block.timestamp > endTs || tokenIdInfos.length() > 0) {
             revert Errors.NotActive();
         }
 
         if (investAmount < key.userMinInvestAmount) {
             revert Errors.Insufficient();
         }
+
         investTotalAmount += investAmount;
         if (investTotalAmount > key.maxFinancingAmount) {
             revert Errors.InvestAmountOverflow();
@@ -234,12 +247,13 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         _;
     }
 
-    function setClaimToken(address _claimTokenAddr) public onlyArena {
+    function setClaimToken(address _claimTokenAddr, uint256 _totalClaimAmount) public onlyArena {
         if (_claimTokenAddr == address(0)) {
             revert Errors.ZeroAddress();
         }
         emit ChangeClaimToken(claimTokenAddr, _claimTokenAddr);
         claimTokenAddr = _claimTokenAddr;
+        totalClaimAmount = _totalClaimAmount;
     }
 
     //1.line distrubution 2. cliff distribution

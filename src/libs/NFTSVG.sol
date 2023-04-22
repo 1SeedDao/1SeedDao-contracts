@@ -17,7 +17,7 @@ contract NFTSVG is INFTSVG {
                 investmentSVG(params.investment),
                 mySharesSVG(params.mySharesStr),
                 tokenIdSVG(params.tokenId),
-                totalInvestmentSVG(params.totalInvestAmountStr),
+                totalInvestmentSVG(params.totalAmountStr),
                 footerSVG(params)
             )
         );
@@ -93,7 +93,7 @@ contract NFTSVG is INFTSVG {
     }
 
     function mySharesSVG(string memory mySharesStr) internal pure returns (string memory svg) {
-        uint256 mySharesLength = (140 - 2 * bytes(mySharesStr).length);
+        uint256 mySharesLength = (150 - 2 * bytes(mySharesStr).length);
         svg = string(
             abi.encodePacked(
                 '<rect x="20" y="400" width="321" height="75" rx="12" fill="url(#paint5_linear_1634_41705)" fill-opacity=".45"/><path fill-rule="evenodd" clip-rule="evenodd" d="M22 463v-51c0-5.523 4.477-10 10-10h80v-2H32c-6.627 0-12 5.373-12 12v51c0 6.627 5.373 12 12 12h298c6.627 0 12-5.373 12-12v-51c0-6.627-5.373-12-12-12h-79v2h79c5.523 0 10 4.477 10 10v51c0 5.523-4.477 10-10 10H32c-5.523 0-10-4.477-10-10z" fill="url(#paint6_linear_1634_41705)"/><text fill="#fff" style="white-space:pre" font-family="Poppins" font-size="20" font-weight="600" letter-spacing="0"><tspan x="',

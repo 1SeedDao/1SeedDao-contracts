@@ -17,18 +17,14 @@ contract ManagerCaller is Script {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-        // MockERC20(usdtAddr).mint(0xD8435B576d5f0AC080f475d7CF8d9f959daf8069, 1000000e6);
-        // MockERC20(usdcAddr).mint(0xD8435B576d5f0AC080f475d7CF8d9f959daf8069, 100000000e18);
-        // MockERC20(usdtAddr).mint(0xf261C5655959e78A3a6DD8d2cfF6e314FC37581a, 1000000e6);
-        // MockERC20(usdcAddr).mint(0xf261C5655959e78A3a6DD8d2cfF6e314FC37581a, 100000000e18);
-        // MockERC20(usdtAddr).mint(0x9129900226EF32e5835A9899c57Ba268b44049cf, 1000000e6);
-        // MockERC20(usdcAddr).mint(0x9129900226EF32e5835A9899c57Ba268b44049cf, 100000000e18);
+        MockERC20(usdtAddr).mint(0x5605aEc48213Be537Cef558dbEC6ba1C0B368270, 1000000e6);
+        MockERC20(usdcAddr).mint(0x5605aEc48213Be537Cef558dbEC6ba1C0B368270, 100000000e18);
+        // MockERC20(usdtAddr).mint(0x6EC8353b1BB5b5c03F6722d3937128F5Ca519409, 1000000e6);
+        // MockERC20(usdcAddr).mint(0x6EC8353b1BB5b5c03F6722d3937128F5Ca519409, 100000000e18);
+        // MockERC20(usdtAddr).mint(0xFC9f5F82d679F5828a896B3fCA6153bD2210b236, 1000000e6);
+        // MockERC20(usdcAddr).mint(0xFC9f5F82d679F5828a896B3fCA6153bD2210b236, 100000000e18);
         // Investment nft = new Investment();
-        // OneSeedDaoArena(payable(0x87E9C188DA59E5564Da4CF67cA1AD48DB71Ab262)).setArgs(
-        //     address(nft),
-        //     100,
-        //     0x817016163775AaF0B25DF274fB4b18edB67E1F26
-        // );
+        // OneSeedDaoArena(payable(0x77C137A0BA78bB54fe94f3087CBA567736eDCCBd)).setArgs(address(nft), 100, 0x817016163775AaF0B25DF274fB4b18edB67E1F26);
 
         // OneSeedDaoArena(payable(0x87E9C188DA59E5564Da4CF67cA1AD48DB71Ab262)).setInvestmentCollateral(
         //     0x98a64b7106A05Ab39a8a754977cDdadb9d47504D, usdcAddr
@@ -38,8 +34,8 @@ contract ManagerCaller is Script {
         // );
         // MockERC20(usdcAddr).transfer(0x87E9C188DA59E5564Da4CF67cA1AD48DB71Ab262, 100e18);
 
-        string memory token = OneSeedDaoArena(payable(0x87E9C188DA59E5564Da4CF67cA1AD48DB71Ab262)).tokenURI(4);
-        console2.log(token);
+        // string memory token = OneSeedDaoArena(payable(0x87E9C188DA59E5564Da4CF67cA1AD48DB71Ab262)).tokenURI(4);
+        // console2.log(token);
         // address[] memory tokens = new address[](1);
         // tokens[0] = address(0);
         // bool[] memory isSupporteds = new bool[](1);

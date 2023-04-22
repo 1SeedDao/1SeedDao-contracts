@@ -48,20 +48,20 @@ contract ManagerDeploy is Script {
         // privateKey = _privateKey;
         // console2.log("admin addr:%s, private key:%s", admin, Strings.toHexString(privateKey));
 
-        // Investment nft = new Investment();
-        // arena = new OneSeedDaoArena(address(nft), 100, 0x817016163775AaF0B25DF274fB4b18edB67E1F26);
-        // address[] memory tokens = new address[](4);
-        // tokens[0] = (address(weth9));
-        // tokens[1] = (address(usdt));
-        // tokens[2] = address(usdc);
-        // tokens[3] = address(0);
-        // bool[] memory isSupporteds = new bool[](4);
-        // isSupporteds[0] = true;
-        // isSupporteds[1] = true;
-        // isSupporteds[2] = true;
-        // isSupporteds[3] = true;
-        // arena.setSupporteds(tokens, isSupporteds);
-        arena = OneSeedDaoArena(payable(0x87E9C188DA59E5564Da4CF67cA1AD48DB71Ab262));
+        Investment nft = new Investment();
+        arena = new OneSeedDaoArena(address(nft), 500, 0x817016163775AaF0B25DF274fB4b18edB67E1F26);
+        address[] memory tokens = new address[](4);
+        tokens[0] = (address(weth9));
+        tokens[1] = (address(usdt));
+        tokens[2] = address(usdc);
+        tokens[3] = address(0);
+        bool[] memory isSupporteds = new bool[](4);
+        isSupporteds[0] = true;
+        isSupporteds[1] = true;
+        isSupporteds[2] = true;
+        isSupporteds[3] = true;
+        arena.setSupporteds(tokens, isSupporteds);
+        // arena = OneSeedDaoArena(payable(0x87E9C188DA59E5564Da4CF67cA1AD48DB71Ab262));
         NFTDescriptor nftDescriptor = new NFTDescriptor(address(new NFTSVG()));
         arena.setTokenURIAddr(address(nftDescriptor));
     }
