@@ -1,5 +1,4 @@
-// File contracts/ArbOtc.sol
-
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
 import "@oc/access/Ownable.sol";
@@ -7,34 +6,35 @@ import "@oc/security/ReentrancyGuard.sol";
 import "@oc/token/ERC20/IERC20.sol";
 
 
-contract ArbOtc is Ownable, ReentrancyGuard {
+contract OneSeedOtc is Ownable, ReentrancyGuard {
 
-    event TradeOfferCreated(uint256 tradeId, address creator, uint256 costPerToken, uint256 tokens);
+    event TradeOfferCreated(uint256 tradeId, address creator, address collateralToken,  uint256 costPerToken, uint256 tokens);
     event TradeOfferCancelled(uint256 tradeId);
     event TradeOfferAccepted(uint256 tradeId);
     event AgreementFulfilled(uint256 agreementId);
 
-    address public USDC_ADDRESS = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8;
-    address public ARB_ADDRESS = 0x912CE59144191C1204E64559FE8253a0e49E6548;
+    mapping(address => bool) public isTokenSupported;
 
-    address public FEE_1 = 0xFf73A0d213effF9864B2Cda7bDBc05821BF1eE1B;
-    address public FEE_2 = 0xD999b4C785804CF8e2B34F64EB0b3CB5e1a6Eef3;
+    address public OTC_ADDRESS = 0x912CE59144191C1204E64559FE8253a0e49E6548;
+
+    address public FEE = 0x817016163775AaF0B25DF274fB4b18edB67E1F26;
 
     //Max and min costs to prevent over/under paying mistakes.
-    uint256 public MAX_COST = 100000000; //Max of 100 USDC
-    uint256 public MIN_COST = 100000; //Min of 0.1 USDC
+    uint256 public MAX_COST = 100000000; //Max of 100 U
+    uint256 public MIN_COST = 100000; //Min of 0.1 U
 
     bool public OFFERS_EXPIRED = false;
     bool public EMERGENCY_WITHDRAWL = false;
     bool public ACCEPTING_OFFERS_ENABLED = true;
 
-    mapping(address => uint256) public USDCDeposited;
+    mapping(address => mapping(address => uint256)) public collateralDeposited;
 
     TradeOffer[] public tradeOffers;
     Agreement[] public agreements;
     
     struct TradeOffer {
         address creator;
+        address collateralToken;
         uint256 tokens;
         uint256 costPerToken;
         uint256 tradeId;
@@ -44,22 +44,26 @@ contract ArbOtc is Ownable, ReentrancyGuard {
     struct Agreement {
         address seller;
         address buyer;
+        address collateralToken;
         uint256 tokens;
         uint256 costPerToken;
         uint256 tradeId;
         bool active;
     }
 
+
     
     /// @notice Allows a seller to create a trade offer
     /// @dev Requires the seller to lock 25% of the total cost as collateral
-    /// @param _costPerToken The cost per token in USDC in a 6 decimal format
-    /// @param _tokens The number of tokens offered in the trade in an 18 decimal format.
-    function createOffer(uint256 _costPerToken, uint256 _tokens) public nonReentrant {
+    /// @param _costPerToken The cost per token in USD in a 6 decimal format
+    /// @param _tokens The number of tokens offered in the trade in an otc decimal format.
+    /// @param _collateralToken The address of the token to use as collateral
+    function createOffer(uint256 _costPerToken, uint256 _tokens, address _collateralToken) public nonReentrant {
         require(_tokens >= 1 ether, "Must be 18 decimal value");
 
         _tokens = _tokens / 1 ether;
 
+        require(isTokenSupported[_collateralToken], "Not Supported");
         require(_costPerToken >= MIN_COST, "Below min cost");
         require(_costPerToken <= MAX_COST, "Above max cost");
         require(_tokens > 0, "Non zero value");
@@ -70,9 +74,9 @@ contract ArbOtc is Ownable, ReentrancyGuard {
 
         uint256 collateral = ((_costPerToken * _tokens) * 25 / 100);
 
-        USDCDeposited[msg.sender] += collateral;
+        collateralDeposited[_collateralToken][msg.sender] += collateral;
 
-        IERC20(USDC_ADDRESS).transferFrom(
+        IERC20(_collateralToken).transferFrom(
             msg.sender,
             address(this),
             collateral
@@ -81,6 +85,7 @@ contract ArbOtc is Ownable, ReentrancyGuard {
 
         TradeOffer memory newOffer = TradeOffer({
             creator: msg.sender,
+            collateralToken: _collateralToken,
             tokens: _tokens,
             costPerToken: _costPerToken,
             tradeId: tradeOffers.length,
@@ -89,7 +94,7 @@ contract ArbOtc is Ownable, ReentrancyGuard {
 
         tradeOffers.push(newOffer);
 
-        emit TradeOfferCreated(newOffer.tradeId, msg.sender, _costPerToken, _tokens);
+        emit TradeOfferCreated(newOffer.tradeId, msg.sender, _collateralToken, _costPerToken, _tokens);
     }
 
     /// @notice Allows the creator of a trade offer to cancel it
@@ -106,9 +111,9 @@ contract ArbOtc is Ownable, ReentrancyGuard {
 
         offer.active = false;
 
-        USDCDeposited[msg.sender] -= collateral;
+        collateralDeposited[offer.collateralToken][msg.sender] -= collateral;
 
-        IERC20(USDC_ADDRESS).transfer(
+        IERC20(offer.collateralToken).transfer(
             msg.sender,
             collateral
         );
@@ -130,9 +135,9 @@ contract ArbOtc is Ownable, ReentrancyGuard {
 
         uint256 cost = offer.costPerToken * offer.tokens;
 
-        USDCDeposited[msg.sender] += cost;
+        collateralDeposited[offer.collateralToken][msg.sender] += cost;
 
-        IERC20(USDC_ADDRESS).transferFrom(
+        IERC20(offer.collateralToken).transferFrom(
             msg.sender,
             address(this),
             cost
@@ -143,6 +148,7 @@ contract ArbOtc is Ownable, ReentrancyGuard {
         Agreement memory newAgreement = Agreement({
             seller: offer.creator,
             buyer: msg.sender,
+            collateralToken: offer.collateralToken,
             tokens: offer.tokens,
             costPerToken: offer.costPerToken,
             tradeId: agreements.length,
@@ -166,60 +172,51 @@ contract ArbOtc is Ownable, ReentrancyGuard {
 
         agreement.active = false;
 
-        uint256 arbToSend = agreement.tokens * 1 ether;
+        uint256 otcToSend = agreement.tokens * 1 ether;
 
-        uint256 arbFee = arbToSend * 5 / 100;
+        uint256 otcFee = otcToSend * 5 / 100;
 
-        IERC20(ARB_ADDRESS).transferFrom(
+        IERC20(OTC_ADDRESS).transferFrom(
             msg.sender,
             agreement.buyer,
-            arbToSend - arbFee
+            otcToSend - otcFee
         );
 
-        IERC20(ARB_ADDRESS).transferFrom(
+        IERC20(OTC_ADDRESS).transferFrom(
             msg.sender,
             address(this),
-            arbFee
+            otcFee
         );
 
-        IERC20(ARB_ADDRESS).transfer(
-            FEE_1,
-            arbFee / 2
-        );
-
-        IERC20(ARB_ADDRESS).transfer(
-            FEE_2,
-            arbFee / 2
+        IERC20(OTC_ADDRESS).transfer(
+            FEE,
+            otcFee
         );
 
         uint256 cost = agreement.costPerToken * agreement.tokens;
         uint256 fee = cost * 5 / 100;
 
-        USDCDeposited[agreement.buyer] -= cost;
+        collateralDeposited[agreement.collateralToken][agreement.buyer] -= cost;
 
-        IERC20(USDC_ADDRESS).transfer(
+        IERC20(agreement.collateralToken).transfer(
             msg.sender,
             cost - fee
         );
 
-        IERC20(USDC_ADDRESS).transfer(
-            FEE_1,
-            fee / 2
+        IERC20(agreement.collateralToken).transfer(
+            FEE,
+            fee
         );
 
-        IERC20(USDC_ADDRESS).transfer(
-            FEE_2,
-            fee / 2
-        );
 
 
         //Return collateral.
         uint256 collateral = ((agreement.costPerToken * agreement.tokens) * 25 / 100);
 
         
-        USDCDeposited[msg.sender] -= collateral;
+        collateralDeposited[agreement.collateralToken][msg.sender] -= collateral;
 
-        IERC20(USDC_ADDRESS).transfer(
+        IERC20(agreement.collateralToken).transfer(
             msg.sender,
             collateral
         );
@@ -245,37 +242,34 @@ contract ArbOtc is Ownable, ReentrancyGuard {
 
         agreement.active = false;
         
-        USDCDeposited[agreement.seller] -= collateral;
-        USDCDeposited[msg.sender] -= cost;
+        collateralDeposited[agreement.collateralToken][agreement.seller] -= collateral;
+        collateralDeposited[agreement.collateralToken][msg.sender] -= cost;
 
-        IERC20(USDC_ADDRESS).transfer(
+        IERC20(agreement.collateralToken).transfer(
             msg.sender,
             (cost + collateral) - fee
         );
 
-        IERC20(USDC_ADDRESS).transfer(
-            FEE_1,
-            fee / 2
-        );
-
-        IERC20(USDC_ADDRESS).transfer(
-            FEE_2,
-            fee / 2
+        IERC20(agreement.collateralToken).transfer(
+            FEE,
+            fee
         );
     }
 
-     /// @notice Allows users to withdraw their deposited USDC in case of an emergency.
-     /// @dev Resets the USDC deposited amount for the user after the withdrawal.
-    function emergencyWithdraw() public nonReentrant {
+     /// @notice Allows users to withdraw their deposited collateral in case of an emergency.
+     /// @dev Resets the collateral deposited amount for the user after the withdrawal.
+     /// @param _collateralToken The address of the collateral token to withdraw
+    function emergencyWithdraw(address _collateralToken) public nonReentrant {
+        require(isTokenSupported[_collateralToken], "Not Supported");
         require(tx.origin == msg.sender, "EOA only");
         require(EMERGENCY_WITHDRAWL, "Emergency not active");
-        require(USDCDeposited[msg.sender] > 0, "No funds available to withdraw");
+        require(collateralDeposited[_collateralToken][msg.sender] > 0, "No funds available to withdraw");
 
-        uint256 amountDeposited = USDCDeposited[msg.sender];
+        uint256 amountDeposited = collateralDeposited[_collateralToken][msg.sender];
 
-        USDCDeposited[msg.sender] = 0;
+        collateralDeposited[_collateralToken][msg.sender] = 0;
 
-        require(IERC20(USDC_ADDRESS).transfer(msg.sender, amountDeposited));
+        require(IERC20(_collateralToken).transfer(msg.sender, amountDeposited));
     }
 
     /// @notice Returns an array of trade offers within the specified range
@@ -319,19 +313,22 @@ contract ArbOtc is Ownable, ReentrancyGuard {
     }
 
 
-    /// @notice Allows the contract owner to set the addresses for USDC, ARB
-    /// @dev This function is restricted to the contract owner
-    /// @param _USDC The address of the USDC token
-    /// @param _ARB The address of the ARB token
-    function setAddresses(address _USDC, address _ARB) public onlyOwner {
-        USDC_ADDRESS = _USDC;
-        ARB_ADDRESS = _ARB;
+    /// @notice Allows the owner set collateral tokens
+    /// @dev Only the owner can call this function
+    /// @param _OTC The address of the OTC token
+    /// @param _collateralTokens The addresses of the tokens to use as collateral
+    /// @param _isSupporteds Whether or not the token is supported
+    function setSupporteds(address _OTC, address[] memory _collateralTokens, bool[] memory _isSupporteds) external onlyOwner {
+        for (uint256 i; i < _collateralTokens.length; i++) {
+            isTokenSupported[_collateralTokens[i]] = _isSupporteds[i];
+        }
+        OTC_ADDRESS = _OTC;
     }
 
     /// @notice Allows the contract owner to set the maximum and minimum acceptable costs per token
     /// @dev This function is restricted to the contract owner
-    /// @param _min The minimum acceptable cost per token in USDC
-    /// @param _max The maximum acceptable cost per token in USDC
+    /// @param _min The minimum acceptable cost per token in USD
+    /// @param _max The maximum acceptable cost per token in USD
     function setMaxAndMin(uint256 _min, uint256 _max) public onlyOwner {
         MIN_COST = _min;
         MAX_COST = _max;
