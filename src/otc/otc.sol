@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import "@oc/access/Ownable.sol";
 import "@oc/security/ReentrancyGuard.sol";
-import "@oc/token/ERC20/IERC20.sol";
+import "@oc/token/ERC20/Extensions/IERC20Metadata.sol";
 
 
 contract OneSeedOtc is Ownable, ReentrancyGuard {
@@ -15,7 +15,8 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
 
     mapping(address => bool) public isTokenSupported;
 
-    address public OTC_ADDRESS = 0x912CE59144191C1204E64559FE8253a0e49E6548;
+    address public OTC_ADDRESS;
+    uint8 public OTC_DECIMALS = 18;
 
     address public FEE = 0x817016163775AaF0B25DF274fB4b18edB67E1F26;
 
@@ -59,10 +60,10 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     /// @param _tokens The number of tokens offered in the trade in an otc decimal format.
     /// @param _collateralToken The address of the token to use as collateral
     function createOffer(uint256 _costPerToken, uint256 _tokens, address _collateralToken) public nonReentrant {
-        require(_tokens >= 1 ether, "Must be 18 decimal value");
+        require(_tokens >= 10 ** OTC_DECIMALS, "Must be gather than 1 token");
 
-        _tokens = _tokens / 1 ether;
-
+        _tokens = _tokens / 10 ** OTC_DECIMALS;
+        require(OTC_ADDRESS != address(0), "OTC not set");
         require(isTokenSupported[_collateralToken], "Not Supported");
         require(_costPerToken >= MIN_COST, "Below min cost");
         require(_costPerToken <= MAX_COST, "Above max cost");
@@ -323,6 +324,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
             isTokenSupported[_collateralTokens[i]] = _isSupporteds[i];
         }
         OTC_ADDRESS = _OTC;
+        OTC_DECIMALS = IERC20Metadata(OTC_ADDRESS).decimals();
     }
 
     /// @notice Allows the contract owner to set the maximum and minimum acceptable costs per token
