@@ -173,7 +173,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
 
         agreement.active = false;
 
-        uint256 otcToSend = agreement.tokens * 1 ether;
+        uint256 otcToSend = agreement.tokens * 10 ** OTC_DECIMALS;
 
         uint256 otcFee = otcToSend * 5 / 100;
 
