@@ -4,19 +4,21 @@ pragma solidity ^0.8.17;
 import "@oc/access/Ownable.sol";
 import "@oc/security/ReentrancyGuard.sol";
 import "@oc/token/ERC20/Extensions/IERC20Metadata.sol";
-
+import "@oc/utils/structs/EnumerableSet.sol";
+import "solmate/utils/FixedPointMathLib.sol";
 
 contract OneSeedOtc is Ownable, ReentrancyGuard {
-
-    event TradeOfferCreated(uint256 tradeId, address creator, address collateralToken,  uint256 costPerToken, uint256 tokens);
+    using EnumerableSet for EnumerableSet.AddressSet;
+    event TradeOfferCreated(uint256 tradeId, address creator, address collateralToken, uint256 costPerToken, uint256 tokens);
     event TradeOfferCancelled(uint256 tradeId);
-    event TradeOfferAccepted(uint256 tradeId);
+    event TradeOfferAccepted(uint256 tradeId, uint256 agreementId);
     event AgreementFulfilled(uint256 agreementId);
+    event Expired(uint256 endTs);
 
-    mapping(address => bool) public isTokenSupported;
+    EnumerableSet.AddressSet private _supportToken;
 
     address public OTC_ADDRESS;
-    uint8 public OTC_DECIMALS = 18;
+    uint256 public OTC_DENOMINATOR = 10 ** 18;
 
     address public FEE = 0x817016163775AaF0B25DF274fB4b18edB67E1F26;
 
@@ -24,7 +26,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     uint256 public MAX_COST = 100000000; //Max of 100 U
     uint256 public MIN_COST = 100000; //Min of 0.1 U
 
-    bool public OFFERS_EXPIRED = false;
+    uint256 public OFFERS_EXPIRED;
     bool public EMERGENCY_WITHDRAWL = false;
     bool public ACCEPTING_OFFERS_ENABLED = true;
 
@@ -32,7 +34,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
 
     TradeOffer[] public tradeOffers;
     Agreement[] public agreements;
-    
+
     struct TradeOffer {
         address creator;
         address collateralToken;
@@ -52,37 +54,27 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
         bool active;
     }
 
-
-    
     /// @notice Allows a seller to create a trade offer
     /// @dev Requires the seller to lock 25% of the total cost as collateral
-    /// @param _costPerToken The cost per token in USD in a 6 decimal format
+    /// @param _costPerToken The cost per token in USD
     /// @param _tokens The number of tokens offered in the trade in an otc decimal format.
     /// @param _collateralToken The address of the token to use as collateral
     function createOffer(uint256 _costPerToken, uint256 _tokens, address _collateralToken) public nonReentrant {
-        require(_tokens >= 10 ** OTC_DECIMALS, "Must be gather than 1 token");
+        require(_tokens >= OTC_DENOMINATOR, "Must be gather than 1 token");
 
-        _tokens = _tokens / 10 ** OTC_DECIMALS;
         require(OTC_ADDRESS != address(0), "OTC not set");
-        require(isTokenSupported[_collateralToken], "Not Supported");
+        require(_supportToken.contains(_collateralToken), "Not Supported");
         require(_costPerToken >= MIN_COST, "Below min cost");
         require(_costPerToken <= MAX_COST, "Above max cost");
-        require(_tokens > 0, "Non zero value");
-        require(!OFFERS_EXPIRED, "Offers not allowed");
+        require(OFFERS_EXPIRED <= block.timestamp, "Offers not allowed");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
 
-
-        uint256 collateral = ((_costPerToken * _tokens) * 25 / 100);
+        uint256 collateral = (FixedPointMathLib.mulDivUp(_costPerToken, _tokens, OTC_DENOMINATOR) * 25 / 100);
 
         collateralDeposited[_collateralToken][msg.sender] += collateral;
 
-        IERC20(_collateralToken).transferFrom(
-            msg.sender,
-            address(this),
-            collateral
-        );
-
+        IERC20(_collateralToken).transferFrom(msg.sender, address(this), collateral);
 
         TradeOffer memory newOffer = TradeOffer({
             creator: msg.sender,
@@ -107,18 +99,15 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
         require(offer.creator == msg.sender, "Not your offer");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
-        
-        uint256 collateral = ((offer.costPerToken * offer.tokens) * 25 / 100);
+
+        uint256 collateral = FixedPointMathLib.mulDivUp(offer.costPerToken, offer.tokens, OTC_DENOMINATOR) * 25 / 100;
 
         offer.active = false;
 
         collateralDeposited[offer.collateralToken][msg.sender] -= collateral;
 
-        IERC20(offer.collateralToken).transfer(
-            msg.sender,
-            collateral
-        );
-        
+        IERC20(offer.collateralToken).transfer(msg.sender, collateral);
+
         emit TradeOfferCancelled(tradeId);
     }
 
@@ -131,18 +120,14 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
         require(msg.sender != offer.creator, "Can't accept own offer");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
-        require(!OFFERS_EXPIRED, "Offers have expired");
+        require(OFFERS_EXPIRED <= block.timestamp, "Offers have expired");
         require(ACCEPTING_OFFERS_ENABLED, "Accepting offers has been disabled");
 
-        uint256 cost = offer.costPerToken * offer.tokens;
+        uint256 cost = FixedPointMathLib.mulDivUp(offer.costPerToken, offer.tokens, OTC_DENOMINATOR);
 
         collateralDeposited[offer.collateralToken][msg.sender] += cost;
 
-        IERC20(offer.collateralToken).transferFrom(
-            msg.sender,
-            address(this),
-            cost
-        );
+        IERC20(offer.collateralToken).transferFrom(msg.sender, address(this), cost);
 
         offer.active = false;
 
@@ -158,7 +143,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
 
         agreements.push(newAgreement);
 
-        emit TradeOfferAccepted(tradeId);
+        emit TradeOfferAccepted(tradeId, newAgreement.tradeId);
     }
 
     /// @notice Allows the seller of an agreement to fulfill it
@@ -173,54 +158,31 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
 
         agreement.active = false;
 
-        uint256 otcToSend = agreement.tokens * 10 ** OTC_DECIMALS;
+        uint256 otcToSend = agreement.tokens;
 
         uint256 otcFee = otcToSend * 5 / 100;
 
-        IERC20(OTC_ADDRESS).transferFrom(
-            msg.sender,
-            agreement.buyer,
-            otcToSend - otcFee
-        );
+        IERC20(OTC_ADDRESS).transferFrom(msg.sender, agreement.buyer, otcToSend - otcFee);
 
-        IERC20(OTC_ADDRESS).transferFrom(
-            msg.sender,
-            address(this),
-            otcFee
-        );
+        IERC20(OTC_ADDRESS).transferFrom(msg.sender, address(this), otcFee);
 
-        IERC20(OTC_ADDRESS).transfer(
-            FEE,
-            otcFee
-        );
+        IERC20(OTC_ADDRESS).transfer(FEE, otcFee);
 
-        uint256 cost = agreement.costPerToken * agreement.tokens;
+        uint256 cost = FixedPointMathLib.mulDivUp(agreement.costPerToken, agreement.tokens, OTC_DENOMINATOR);
         uint256 fee = cost * 5 / 100;
 
         collateralDeposited[agreement.collateralToken][agreement.buyer] -= cost;
 
-        IERC20(agreement.collateralToken).transfer(
-            msg.sender,
-            cost - fee
-        );
+        IERC20(agreement.collateralToken).transfer(msg.sender, cost - fee);
 
-        IERC20(agreement.collateralToken).transfer(
-            FEE,
-            fee
-        );
-
-
+        IERC20(agreement.collateralToken).transfer(FEE, fee);
 
         //Return collateral.
-        uint256 collateral = ((agreement.costPerToken * agreement.tokens) * 25 / 100);
+        uint256 collateral = (cost * 25 / 100);
 
-        
         collateralDeposited[agreement.collateralToken][msg.sender] -= collateral;
 
-        IERC20(agreement.collateralToken).transfer(
-            msg.sender,
-            collateral
-        );
+        IERC20(agreement.collateralToken).transfer(msg.sender, collateral);
 
         emit AgreementFulfilled(agreementId);
     }
@@ -231,37 +193,31 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     function claimCollateral(uint256 agreementId) public nonReentrant {
         Agreement storage agreement = agreements[agreementId];
         require(msg.sender == agreement.buyer, "Not buyer");
-        require(OFFERS_EXPIRED, "Agreement not expired yet");
+        require(OFFERS_EXPIRED > block.timestamp, "Agreement not expired yet");
         require(agreement.active, "Agreement not active");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
 
-        uint256 cost = agreement.costPerToken * agreement.tokens;
+        uint256 cost = FixedPointMathLib.mulDivUp(agreement.costPerToken, agreement.tokens, OTC_DENOMINATOR);
 
         uint256 collateral = cost * 25 / 100;
         uint256 fee = collateral * 20 / 100;
 
         agreement.active = false;
-        
+
         collateralDeposited[agreement.collateralToken][agreement.seller] -= collateral;
         collateralDeposited[agreement.collateralToken][msg.sender] -= cost;
 
-        IERC20(agreement.collateralToken).transfer(
-            msg.sender,
-            (cost + collateral) - fee
-        );
+        IERC20(agreement.collateralToken).transfer(msg.sender, (cost + collateral) - fee);
 
-        IERC20(agreement.collateralToken).transfer(
-            FEE,
-            fee
-        );
+        IERC20(agreement.collateralToken).transfer(FEE, fee);
     }
 
-     /// @notice Allows users to withdraw their deposited collateral in case of an emergency.
-     /// @dev Resets the collateral deposited amount for the user after the withdrawal.
-     /// @param _collateralToken The address of the collateral token to withdraw
+    /// @notice Allows users to withdraw their deposited collateral in case of an emergency.
+    /// @dev Resets the collateral deposited amount for the user after the withdrawal.
+    /// @param _collateralToken The address of the collateral token to withdraw
     function emergencyWithdraw(address _collateralToken) public nonReentrant {
-        require(isTokenSupported[_collateralToken], "Not Supported");
+        require(_supportToken.contains(_collateralToken), "Not Supported");
         require(tx.origin == msg.sender, "EOA only");
         require(EMERGENCY_WITHDRAWL, "Emergency not active");
         require(collateralDeposited[_collateralToken][msg.sender] > 0, "No funds available to withdraw");
@@ -281,7 +237,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     function getOffers(uint256 startIndex, uint256 endIndex) public view returns (TradeOffer[] memory) {
         require(startIndex < endIndex, "Invalid range");
 
-        if(endIndex > tradeOffers.length) endIndex = tradeOffers.length;
+        if (endIndex > tradeOffers.length) endIndex = tradeOffers.length;
 
         uint256 length = endIndex - startIndex;
         TradeOffer[] memory offers = new TradeOffer[](length);
@@ -301,7 +257,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     function getAgreements(uint256 startIndex, uint256 endIndex) public view returns (Agreement[] memory) {
         require(startIndex < endIndex, "Invalid range");
 
-        if(endIndex > agreements.length) endIndex = agreements.length;
+        if (endIndex > agreements.length) endIndex = agreements.length;
 
         uint256 length = endIndex - startIndex;
         Agreement[] memory agmts = new Agreement[](length);
@@ -313,18 +269,38 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
         return agmts;
     }
 
-
-    /// @notice Allows the owner set collateral tokens
+    /// @notice Allows the owner set collateral tokens 
     /// @dev Only the owner can call this function
-    /// @param _OTC The address of the OTC token
     /// @param _collateralTokens The addresses of the tokens to use as collateral
     /// @param _isSupporteds Whether or not the token is supported
-    function setSupporteds(address _OTC, address[] memory _collateralTokens, bool[] memory _isSupporteds) external onlyOwner {
+    function setSupporteds(address[] memory _collateralTokens, bool[] memory _isSupporteds) external onlyOwner {
         for (uint256 i; i < _collateralTokens.length; i++) {
-            isTokenSupported[_collateralTokens[i]] = _isSupporteds[i];
+            if (_isSupporteds[i]) {
+                _supportToken.add(_collateralTokens[i]);
+            } else {
+                if (_supportToken.contains(_collateralTokens[i])) {
+                    _supportToken.remove(_collateralTokens[i]);
+                }
+            }
+        
         }
+    }
+
+    /// @notice Returns an array of supported collateral tokens
+    function getSupports() external view returns (address[] memory collaterals) {
+        uint256 length = _supportToken.length();
+        collaterals = new address[](length);
+        for (uint256 i; i < length; i++) {
+            collaterals[i] = _supportToken.at(i);
+        }
+    }
+
+    /// @notice Allows the owner to set the OTC address
+    /// @dev Only the owner can call this function
+    /// @param _OTC The address of the OTC token
+    function setOTC(address _OTC) external onlyOwner {
         OTC_ADDRESS = _OTC;
-        OTC_DECIMALS = IERC20Metadata(OTC_ADDRESS).decimals();
+        OTC_DENOMINATOR = 10 ** IERC20Metadata(OTC_ADDRESS).decimals();
     }
 
     /// @notice Allows the contract owner to set the maximum and minimum acceptable costs per token
@@ -346,8 +322,10 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     /// @notice Expires all offers
     /// @dev Can only be called by the contract owner.
     /// Owner has incentive to call this at the correct time to maximise fees.
-    function expireOffers() public onlyOwner {
-        OFFERS_EXPIRED = true;
+    /// @param endTs The timestamp at which all offers should expire
+    function expireOffers(uint256 endTs) public onlyOwner {
+        OFFERS_EXPIRED = endTs;
+        emit Expired(OFFERS_EXPIRED);
     }
 
     /// @notice Enables emergency withdrawals for users.

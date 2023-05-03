@@ -132,7 +132,7 @@ contract OneSeedDaoTest is Test {
 
         arena.investmentDistribute(address(usdtInvestment), 1111 * 1e18);
         // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
-        startHoax(sender);
+        startHoax(sender, sender);
         (uint256[] memory tokenIds, uint256[] memory amounts) = usdtInvestment.tokenIds(sender);
         usdtInvestment.claimBatch(tokenIds);
         vm.stopPrank();
@@ -150,7 +150,7 @@ contract OneSeedDaoTest is Test {
         arena.transferFrom(addr, sender, ethTokenIds[0]);
         vm.stopPrank();
 
-        startHoax(sender);
+        startHoax(sender, sender);
         (uint256[] memory ethTokenIds1, uint256[] memory ethAmounts1) = ethInvestment.tokenIds(sender);
         ethInvestment.claimBatch(ethTokenIds1);
         assertEq(t.balanceOf(sender), 10 * 1e18 + 11.11 * 1e18 + 10 * 1e18);
@@ -181,7 +181,7 @@ contract OneSeedDaoTest is Test {
         arena.investmentDistribute(address(ethInvestment), 100 * 1e18);
         arena.setTokenURIAddr(address(nftDescriptor));
         // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
-        startHoax(sender);
+        startHoax(sender, sender);
         uint256[] memory ids = new uint256[](1);
         ids[0] = arena.tokenOfOwnerByIndex(sender, 0);
         // ethInvestment.claimBatch(ids);
@@ -193,7 +193,7 @@ contract OneSeedDaoTest is Test {
 
     function randomSelectSender(uint8 random) public returns (address sender) {
         sender = allUsers[random % allUsers.length];
-        startHoax(sender);
+        startHoax(sender, sender);
         usdt.mint(sender, MINT_AMOUNT);
     }
 

@@ -103,9 +103,9 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
         if (!_investmentSet.contains(investmentAddr)) {
             revert Errors.InvestmentNotExists(investmentAddr);
         }
-        // if (tx.origin != msg.sender) {
-        //     revert Errors.OnlyEOA();
-        // }
+        if (tx.origin != msg.sender) {
+            revert Errors.OnlyEOA();
+        }
         InvestmentKey memory key = IInvestState(investmentAddr).investmentKey();
         uint256 amount;
         if (key.collateralToken != address(0)) {
