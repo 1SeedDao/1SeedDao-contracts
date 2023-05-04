@@ -11,8 +11,9 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
     event TradeOfferCreated(uint256 tradeId, address creator, address collateralToken, uint256 costPerToken, uint256 tokens);
     event TradeOfferCancelled(uint256 tradeId);
-    event TradeOfferAccepted(uint256 tradeId, uint256 agreementId);
+    event TradeOfferAccepted(uint256 tradeId, uint256 agreementId, address seller, address buyer);
     event AgreementFulfilled(uint256 agreementId);
+    event Claimed(uint256 agreementId, address buyer, address collateralToken, uint256 amount, uint256 fee);
     event Expired(uint256 endTs);
 
     EnumerableSet.AddressSet private _supportToken;
@@ -143,7 +144,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
 
         agreements.push(newAgreement);
 
-        emit TradeOfferAccepted(tradeId, newAgreement.tradeId);
+        emit TradeOfferAccepted(tradeId, newAgreement.tradeId, newAgreement.seller, newAgreement.buyer);
     }
 
     /// @notice Allows the seller of an agreement to fulfill it
@@ -211,6 +212,8 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
         IERC20(agreement.collateralToken).transfer(msg.sender, (cost + collateral) - fee);
 
         IERC20(agreement.collateralToken).transfer(FEE, fee);
+
+        emit Claimed(agreementId, msg.sender, agreement.collateralToken, (cost + collateral) - fee, fee);
     }
 
     /// @notice Allows users to withdraw their deposited collateral in case of an emergency.
