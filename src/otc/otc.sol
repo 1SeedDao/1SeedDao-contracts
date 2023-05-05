@@ -153,6 +153,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     function fulfilOffer(uint256 agreementId) public nonReentrant {
         Agreement storage agreement = agreements[agreementId];
         require(agreement.active, "Not active");
+        require(OFFERS_EXPIRED <= block.timestamp, "Agreement expired yet");
         require(msg.sender == agreement.seller, "Not seller");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
