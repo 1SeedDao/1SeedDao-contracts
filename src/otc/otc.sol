@@ -67,7 +67,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
         require(_supportToken.contains(_collateralToken), "Not Supported");
         require(_costPerToken >= MIN_COST, "Below min cost");
         require(_costPerToken <= MAX_COST, "Above max cost");
-        require(OFFERS_EXPIRED <= block.timestamp, "Offers not allowed");
+        require(OFFERS_EXPIRED == 0 || OFFERS_EXPIRED > block.timestamp, "Offers not allowed");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
 
@@ -121,7 +121,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
         require(msg.sender != offer.creator, "Can't accept own offer");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
-        require(OFFERS_EXPIRED <= block.timestamp, "Offers have expired");
+        require(OFFERS_EXPIRED == 0 || OFFERS_EXPIRED > block.timestamp, "Offers have expired");
         require(ACCEPTING_OFFERS_ENABLED, "Accepting offers has been disabled");
 
         uint256 cost = FixedPointMathLib.mulDivUp(offer.costPerToken, offer.tokens, OTC_DENOMINATOR);
@@ -153,7 +153,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     function fulfilOffer(uint256 agreementId) public nonReentrant {
         Agreement storage agreement = agreements[agreementId];
         require(agreement.active, "Not active");
-        require(OFFERS_EXPIRED <= block.timestamp, "Agreement expired yet");
+        require(OFFERS_EXPIRED == 0 || OFFERS_EXPIRED > block.timestamp, "Agreement expired yet");
         require(msg.sender == agreement.seller, "Not seller");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
@@ -328,6 +328,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     /// Owner has incentive to call this at the correct time to maximise fees.
     /// @param endTs The timestamp at which all offers should expire
     function expireOffers(uint256 endTs) public onlyOwner {
+        require(endTs > block.timestamp, "Must be in the future");
         OFFERS_EXPIRED = endTs;
         emit Expired(OFFERS_EXPIRED);
     }

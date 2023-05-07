@@ -42,6 +42,7 @@ contract OTCTest is Test {
             otcToken.approve(address(otc), type(uint256).max);
             vm.stopPrank();
         }
+        otc.expireOffers(block.timestamp + 1 days);
     }
 
     function test_Otc(uint8 actorIndexSeed) public {
@@ -53,13 +54,23 @@ contract OTCTest is Test {
         otc.createOffer(costPerToken, tokens * 5, address(usdt));
         vm.stopPrank();
 
-        address buyer = randomSelectSender(uint256(actorIndexSeed)+1);
+        randomSelectSender(uint256(actorIndexSeed)+1);
         otc.acceptOffer(1);
         vm.stopPrank();
 
         vm.startPrank(seller, seller);
         otc.fulfilOffer(0);
+        otc.createOffer(costPerToken, tokens * 5, address(usdt));
         vm.stopPrank();
+                randomSelectSender(uint256(actorIndexSeed)+1);
+
+        otc.acceptOffer(2);
+
+
+        skip(1 days +1);
+        otc.acceptOffer(2);
+        vm.stopPrank();
+
 
     }
 
