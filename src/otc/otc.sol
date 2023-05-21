@@ -15,6 +15,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     event AgreementFulfilled(uint256 agreementId);
     event Claimed(uint256 agreementId, address buyer, address collateralToken, uint256 amount, uint256 fee);
     event Expired(uint256 endTs);
+    event EmergencyWithdrawlsEnabled(bool enabled);
 
     EnumerableSet.AddressSet private _supportToken;
 
@@ -335,7 +336,8 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
 
     /// @notice Enables emergency withdrawals for users.
     /// @dev Can only be called by the contract owner.
-    function triggerEmergencyWithdrawls() public onlyOwner {
-        EMERGENCY_WITHDRAWL = true;
+    function triggerEmergencyWithdrawls(bool enabled) public onlyOwner {
+        EMERGENCY_WITHDRAWL = enabled;
+        emit EmergencyWithdrawlsEnabled(enabled);
     }
 }

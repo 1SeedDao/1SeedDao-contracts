@@ -177,7 +177,6 @@ contract OneSeedDaoTest is Test {
         ethInvestment.submitResult(30);
         ethInvestment.submitResult(30);
 
-        vm.stopPrank();
         arena.investmentDistribute(address(ethInvestment), 100 * 1e18);
         arena.setTokenURIAddr(address(nftDescriptor));
         // assertEq(usdtInvestment.pengdingClaim(0), 10 * 1e18);
