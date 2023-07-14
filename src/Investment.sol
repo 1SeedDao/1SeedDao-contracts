@@ -31,7 +31,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     uint256 public totalClaimAmount;
 
     CreateInvestmentParams public cip;
-    uint256 private _fee; // 1/10000
+    uint256 private _fee;
     uint256 public endTs;
     bool public isInvestFailed;
     string public _baseTokenURI;

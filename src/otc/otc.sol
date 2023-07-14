@@ -9,6 +9,7 @@ import "solmate/utils/FixedPointMathLib.sol";
 
 contract OneSeedOtc is Ownable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
+
     event TradeOfferCreated(uint256 tradeId, address creator, address collateralToken, uint256 costPerToken, uint256 tokens);
     event TradeOfferCancelled(uint256 tradeId);
     event TradeOfferAccepted(uint256 tradeId, uint256 agreementId, address seller, address buyer);
@@ -154,7 +155,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
     function fulfilOffer(uint256 agreementId) public nonReentrant {
         Agreement storage agreement = agreements[agreementId];
         require(agreement.active, "Not active");
-        require(OFFERS_EXPIRED == 0 || OFFERS_EXPIRED > block.timestamp, "Agreement expired yet");
+        require(OFFERS_EXPIRED > block.timestamp, "Agreement expired yet");
         require(msg.sender == agreement.seller, "Not seller");
         require(tx.origin == msg.sender, "EOA only");
         require(!EMERGENCY_WITHDRAWL, "Emergency withdrawl enabled");
@@ -274,7 +275,7 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
         return agmts;
     }
 
-    /// @notice Allows the owner set collateral tokens 
+    /// @notice Allows the owner set collateral tokens
     /// @dev Only the owner can call this function
     /// @param _collateralTokens The addresses of the tokens to use as collateral
     /// @param _isSupporteds Whether or not the token is supported
@@ -287,7 +288,6 @@ contract OneSeedOtc is Ownable, ReentrancyGuard {
                     _supportToken.remove(_collateralTokens[i]);
                 }
             }
-        
         }
     }
 

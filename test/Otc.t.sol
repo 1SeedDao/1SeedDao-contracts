@@ -62,18 +62,17 @@ contract OTCTest is Test {
         otc.fulfilOffer(0);
         otc.createOffer(costPerToken, tokens * 5, address(usdt));
         vm.stopPrank();
-        randomSelectSender(uint256(actorIndexSeed) + 1);
+        //
 
-        otc.acceptOffer(2);
-
+        // otc.acceptOffer(2);
+        otc.expireOffers(block.timestamp + 1 days);
         skip(1 days + 1);
+        randomSelectSender(uint256(actorIndexSeed) + 1);
         otc.acceptOffer(2);
         vm.stopPrank();
     }
 
-    function randomSelectSender(
-        uint256 random
-    ) public returns (address sender) {
+    function randomSelectSender(uint256 random) public returns (address sender) {
         console2.log(random);
         sender = users[random % users.length];
         startHoax(sender, sender);

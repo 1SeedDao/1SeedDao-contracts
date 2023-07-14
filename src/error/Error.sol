@@ -12,6 +12,12 @@ library Errors {
 
     error NFTNotExists();
 
+    error NFTAlreadyExists();
+
+    error NFTTransferNotAllowed();
+
+    error InvalidMerkleProof();
+
     error NFTNotOwner();
 
     error InvestmentNotExists(address addr);
