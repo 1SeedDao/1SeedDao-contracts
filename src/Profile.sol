@@ -28,6 +28,7 @@ contract Profile is ERC721, AccessControl, Pausable, ReentrancyGuard {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        baseTokenURI = "ipfs://bafkreifhxiuc2lgjkbk2pki5wzt4puqfebxfhydkpxmxdbdjdk2saej2pi";
     }
 
     function setBaseTokenURI(string memory _baseTokenURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -88,15 +89,14 @@ contract Profile is ERC721, AccessControl, Pausable, ReentrancyGuard {
         payable(withdrawTo).transfer(address(this).balance);
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
-        internal
-        override
-        whenNotPaused
-    {
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override whenNotPaused {
+        // Do not allow token transfer if `from` is not zero address (i.e., not minting operation)
         if (from != address(0)) {
             revert Errors.NFTTransferNotAllowed();
         }
 
+        // Ensure that the address does not already own a token
         if (balanceOf(to) >= 1) {
             revert Errors.NFTAlreadyExists();
         }

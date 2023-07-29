@@ -241,14 +241,12 @@ contract OneSeedDaoTest is Test {
         proof.push(bytes32(0x446350716b4c9e2ef27fbe28b86f873e05af5ca7039c2c074e7bc8620942db81));
         proof.push(bytes32(0xbe7966f6450de89dc58281dc0bcf3918cb88471185f81be5ad244fc03f399302));
         proof.push(bytes32(0xfdbb7d14a8ea2c9905d95e6168e0db4cd0bc307a4a4d5a45e2339a57ae4554ac));
-        
 
         profile.wlMint(proof);
-         vm.stopPrank();
+        vm.stopPrank();
 
         address _sender = randomSelectSender(1);
         profile.publicMint{value: 0.05 ether}();
-
     }
 
     function randomSelectSender(uint8 random) public returns (address sender) {

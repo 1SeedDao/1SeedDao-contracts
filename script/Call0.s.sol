@@ -11,18 +11,16 @@ import "forge-std/console2.sol";
 import "self/Profile.sol";
 
 contract ManagerCaller is Script {
-    address usdtAddr = 0x23dB9cE6eBA335E2919Db22622E13492d4422827;
-    address usdcAddr = 0x0Bb2d76D24c433887a01b2BDc822ee8A73C8B886;
+    address usdtAddr = 0x310351A43c35CB2cF1dCAd649889184d123b942c;
+    address usdcAddr = 0x0c0b7A497405a599022e473F8c7BF73A5E442A1e;
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-        MockERC20(usdtAddr).mint(0x5605aEc48213Be537Cef558dbEC6ba1C0B368270, 1000000e6);
-        MockERC20(usdcAddr).mint(0x5605aEc48213Be537Cef558dbEC6ba1C0B368270, 100000000e18);
-        // MockERC20(usdtAddr).mint(0x6EC8353b1BB5b5c03F6722d3937128F5Ca519409, 1000000e6);
-        // MockERC20(usdcAddr).mint(0x6EC8353b1BB5b5c03F6722d3937128F5Ca519409, 100000000e18);
-        // MockERC20(usdtAddr).mint(0xFC9f5F82d679F5828a896B3fCA6153bD2210b236, 1000000e6);
-        // MockERC20(usdcAddr).mint(0xFC9f5F82d679F5828a896B3fCA6153bD2210b236, 100000000e18);
+        // MockERC20(usdtAddr).mint(0x817016163775AaF0B25DF274fB4b18edB67E1F26, 100000000e6);
+        // MockERC20(usdcAddr).mint(0x817016163775AaF0B25DF274fB4b18edB67E1F26, 100000000e6);
+        MockERC20(usdtAddr).mint(0x9bA7B42139dddB676E936632f1DfE8dE8F9c0A5b, 100000000e6);
+        MockERC20(usdcAddr).mint(0x9bA7B42139dddB676E936632f1DfE8dE8F9c0A5b, 100000000e6);
         // Investment nft = new Investment();
         // OneSeedDaoArena(payable(0x77C137A0BA78bB54fe94f3087CBA567736eDCCBd)).setArgs(address(nft), 100, 0x817016163775AaF0B25DF274fB4b18edB67E1F26);
 
