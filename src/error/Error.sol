@@ -6,7 +6,11 @@ library Errors {
 
     error InsufficientCollateral();
 
+    error NotDeployer(address sender, address deployer);
+
     error ZeroAddress();
+
+    error SubmitFailed();
 
     error AmountInsufficient();
 
@@ -26,7 +30,7 @@ library Errors {
 
     error ParamsNotMatch();
 
-    error NotSupported();
+    error NotSupported(address token);
 
     error NotNeedChange();
 

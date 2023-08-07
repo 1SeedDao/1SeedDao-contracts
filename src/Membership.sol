@@ -6,12 +6,10 @@ import "@oc/access/AccessControl.sol";
 import "@oc/security/Pausable.sol";
 import "@oc/security/ReentrancyGuard.sol";
 import "@oc/utils/cryptography/MerkleProof.sol";
-import "@oc/utils/Strings.sol";
 import "@oc/utils/Counters.sol";
 import "self/error/Error.sol";
 
-contract Profile is ERC721, AccessControl, Pausable, ReentrancyGuard {
-    using Strings for uint256;
+contract Membership is ERC721, AccessControl, Pausable, ReentrancyGuard {
     using Counters for Counters.Counter;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -23,12 +21,14 @@ contract Profile is ERC721, AccessControl, Pausable, ReentrancyGuard {
     uint256 public publicPrice = 0.05 ether;
     address payable withdrawTo; //withdraw to this address
 
-    constructor(address payable _withdrawTo) ERC721("Profile NFT", "Profile NFT") {
-        withdrawTo = _withdrawTo;
+    constructor() ERC721("Membership", "MEMBER") {
+        withdrawTo = payable(msg.sender);
+        baseTokenURI = "ipfs://bafkreifhxiuc2lgjkbk2pki5wzt4puqfebxfhydkpxmxdbdjdk2saej2pi";
+        wlMerkleRoot = 0x26c2e04f318c6164078d7d840f186185c12709c1ce0c1a096c9b57fb14059f00;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
-        baseTokenURI = "ipfs://bafkreifhxiuc2lgjkbk2pki5wzt4puqfebxfhydkpxmxdbdjdk2saej2pi";
+        pause();
     }
 
     function setBaseTokenURI(string memory _baseTokenURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -57,7 +57,7 @@ contract Profile is ERC721, AccessControl, Pausable, ReentrancyGuard {
         }
     }
 
-    function wlMint(bytes32[] calldata _merkleProof) public whenNotPaused {
+    function wlMint(bytes32[] calldata _merkleProof) public whenNotPaused nonReentrant {
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         if (!MerkleProof.verify(_merkleProof, wlMerkleRoot, leaf)) {
             revert Errors.InvalidMerkleProof();
@@ -85,10 +85,17 @@ contract Profile is ERC721, AccessControl, Pausable, ReentrancyGuard {
         wlMerkleRoot = root;
     }
 
-    function withdraw() external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
-        payable(withdrawTo).transfer(address(this).balance);
+    function setWithdrawTo(address payable _withdrawTo) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        withdrawTo = _withdrawTo;
     }
 
+    function setPublicPrice(uint256 _price) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        publicPrice = _price;
+    }
+
+    function withdraw() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        payable(withdrawTo).transfer(address(this).balance);
+    }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override whenNotPaused {
         // Do not allow token transfer if `from` is not zero address (i.e., not minting operation)

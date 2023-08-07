@@ -47,7 +47,7 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
      * @param _fee Fee associated with the investment.
      * @param _validator Validator address.
      */
-    constructor(address _investmentImplAddr, uint256 _fee, address _validator) ERC721("One Seed Dao", "NFT") {
+    constructor(address _investmentImplAddr, uint256 _fee, address _validator) ERC721("1Seed Investment", "1NVEST") {
         investmentImplAddr = _investmentImplAddr;
         fee = _fee;
         validator = _validator;
@@ -94,13 +94,13 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
         returns (address investmentAddr, bytes32 investKeyB32)
     {
         // financing address error
-        if (params.key.financingWallet == address(0)) {
-            revert Errors.ZeroAddress();
+        if (params.key.financingWallet != msg.sender) {
+            revert Errors.NotDeployer(msg.sender, params.key.financingWallet);
         }
 
         // not supported
         if (!isTokenSupported[params.key.collateralToken]) {
-            revert Errors.NotSupported();
+            revert Errors.NotSupported(params.key.collateralToken);
         }
 
         if (params.key.minFinancingAmount == 0 || params.key.maxFinancingAmount == 0 || params.key.userMinInvestAmount == 0) {
@@ -207,7 +207,6 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
      * @param name Name of the investment.
      * @param symbol Symbol of the investment.
      */
-
     function InvestmentAddr(string memory name, string memory symbol) public view returns (address) {
         return investmentAddrs[keccak256(abi.encodePacked(name, symbol))];
     }

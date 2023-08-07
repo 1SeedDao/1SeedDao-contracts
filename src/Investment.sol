@@ -34,7 +34,6 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     uint256 private _fee;
     uint256 public endTs;
     bool public isInvestFailed;
-    string public _baseTokenURI;
 
     event Investment(address investor, address token, uint256 amount);
     event Refund(address investor, address token, uint256 amount);
@@ -67,19 +66,19 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
      */
     function submitResult(uint256 _mintBatch) external {
         InvestmentKey memory key = cip.key;
-        if (investTotalAmount < key.minFinancingAmount) {
+        if (isInvestFailed) {
+            revert Errors.SubmitFailed();
+        }
+        uint256 normalFinancingAmount = (key.minFinancingAmount + key.maxFinancingAmount) / 2;
+        if (investTotalAmount < normalFinancingAmount) {
             if (block.timestamp <= endTs) {
                 revert Errors.NotNeedChange();
-            } else {
-                isInvestFailed = true;
-                emit InvestStatus(false, key.financingWallet, 0, 0);
-                return;
             }
+            isInvestFailed = true;
+            emit InvestStatus(false, key.financingWallet, 0, 0);
+            return;
         }
-        uint256 l = _infos.length();
-        if (l > _mintBatch) {
-            l = _mintBatch;
-        }
+        uint256 l = _infos.length() > _mintBatch ? _mintBatch : _infos.length();
         for (uint256 i; i < l; i++) {
             uint256 count = tokenIdInfos.length();
             if (count >= _infos.length()) break;
@@ -169,6 +168,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function claimToken() external view override returns (address, uint256) {
         return (claimTokenAddr, totalClaimAmount);
     }
+
     /**
      * @dev Returns the investment amount of a specific investor
      * @param investor Address of the investor
@@ -181,6 +181,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         }
         return _infos.get(investor);
     }
+
     /**
      * @dev Returns the total number of investors
      * @return The total number of investors
@@ -189,6 +190,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function investorCount() public view returns (uint256) {
         return _infos.length();
     }
+
     /**
      * @dev Returns the symbol of the investment
      * @return The symbol of the investment
@@ -197,6 +199,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function investmentSymbol() external view override returns (string memory) {
         return cip.symbol;
     }
+
     /**
      * @dev Returns the total amount of the investment
      * @return The total amount of the investment
@@ -205,6 +208,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function totalInvestment() external view override returns (uint256) {
         return investTotalAmount;
     }
+
     /**
      * @dev Returns an array containing all token IDs
      * @return ids An array containing all token IDs
@@ -217,6 +221,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
             ids[i] = id;
         }
     }
+
     /**
      * @dev Returns the amount of shares associated with a specific token ID
      * @param tokenId Token ID for which the shares should be returned
@@ -229,6 +234,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         }
         return tokenIdInfos.get(tokenId);
     }
+
     /**
      * @dev Returns the total number of tokens
      * @return The total number of tokens
@@ -237,6 +243,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function tokenCount() external view returns (uint256) {
         return tokenIdInfos.length();
     }
+
     /**
      * @dev Returns the investment key
      * @return The investment key
@@ -245,6 +252,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function investmentKey() external view override returns (InvestmentKey memory) {
         return cip.key;
     }
+
     /**
      * @dev Returns the token IDs and the corresponding amounts for a specific owner
      * @param owner The address of the owner
@@ -270,6 +278,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
             amounts[i] = tokenIdInfos.get(allIds[i]);
         }
     }
+
     /**
      * @dev Returns the round of a specific token ID
      * @param tokenId Token ID for which the round should be returned
@@ -279,6 +288,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function nftRound(uint256 tokenId) external view override returns (uint256) {
         return tokenIdClaimedRounds[tokenId];
     }
+
     /**
      * @dev Allows investors to retrieve their funds in case the investment has failed.
      * This function checks if the investment has failed and if so, transfers the invested funds back to the investor.
@@ -288,10 +298,16 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
     function refund() external {
         InvestmentKey memory key = cip.key;
         uint256 refundAmount = _infos.get(msg.sender);
+        if (!isInvestFailed && investTotalAmount < key.minFinancingAmount) {
+            if (block.timestamp > endTs) {
+                isInvestFailed = true;
+                emit InvestStatus(false, key.financingWallet, 0, 0);
+            }
+        }
         if (!isInvestFailed || refundAmount == 0) {
             revert Errors.RefundFail();
         }
-
+        investTotalAmount -= refundAmount;
         if (key.collateralToken == address(0)) {
             SafeTransferLib.safeTransferETH(msg.sender, refundAmount);
         } else {
@@ -349,6 +365,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
         claimTokenAddr = _claimTokenAddr;
         totalClaimAmount = _totalClaimAmount;
     }
+
     /**
      * @dev Distributes the collateral, 1.line distrubution 2. cliff distribution
      * @param amount The amount of collateral to be distributed

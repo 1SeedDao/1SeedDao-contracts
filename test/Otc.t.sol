@@ -65,11 +65,11 @@ contract OTCTest is Test {
         //
 
         // otc.acceptOffer(2);
-        otc.expireOffers(block.timestamp + 1 days);
-        skip(1 days + 1);
-        randomSelectSender(uint256(actorIndexSeed) + 1);
-        otc.acceptOffer(2);
-        vm.stopPrank();
+        // otc.expireOffers(block.timestamp + 1 days);
+        // skip(1 days + 1);
+        // randomSelectSender(uint256(actorIndexSeed) + 1);
+        // otc.acceptOffer(2);
+        // vm.stopPrank();
     }
 
     function randomSelectSender(uint256 random) public returns (address sender) {

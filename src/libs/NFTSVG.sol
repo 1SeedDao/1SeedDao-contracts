@@ -15,9 +15,9 @@ contract NFTSVG is INFTSVG {
             abi.encodePacked(
                 headerSVG(params),
                 investmentSVG(params.investment),
-                mySharesSVG(params.mySharesStr),
+                mySharesSVG(params.mySharesStr, params.claimTokenAddress),
                 tokenIdSVG(params.tokenId),
-                totalInvestmentSVG(params.totalAmountStr),
+                totalInvestmentSVG(params.totalAmountStr, params.claimTokenAddress),
                 footerSVG(params)
             )
         );
@@ -68,12 +68,18 @@ contract NFTSVG is INFTSVG {
         );
     }
 
-    function totalInvestmentSVG(string memory totalInvestAmountStr) internal pure returns (string memory svg) {
+    function totalInvestmentSVG(string memory totalInvestAmountStr, address claimTokenAddress) internal pure returns (string memory svg) {
+        string memory financingTag = "Total financing";
+        if (claimTokenAddress != address(0)) {
+            financingTag = "Total claimable";
+        }
         svg = string(
             abi.encodePacked(
                 '<rect x="19" y="351" width="',
                 (170 + 5 * bytes(totalInvestAmountStr).length).toString(),
-                '" height="25" rx="10" fill="#00031B" fill-opacity="0.2"/><text opacity="0.7" fill="white" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="14" letter-spacing="0.005em"><tspan x="27" y="368.591">Total financing: </tspan></text><text fill="white" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="14" letter-spacing="0.005em"><tspan x="133" y="368.591">',
+                '" height="25" rx="10" fill="#00031B" fill-opacity="0.2"/><text opacity="0.7" fill="white" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="14" letter-spacing="0.005em"><tspan x="27" y="368.591">',
+                financingTag,
+                ': </tspan></text><text fill="white" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="14" letter-spacing="0.005em"><tspan x="133" y="368.591">',
                 totalInvestAmountStr,
                 "</tspan></text>"
             )
@@ -92,15 +98,21 @@ contract NFTSVG is INFTSVG {
         );
     }
 
-    function mySharesSVG(string memory mySharesStr) internal pure returns (string memory svg) {
+    function mySharesSVG(string memory mySharesStr, address claimTokenAddress) internal pure returns (string memory svg) {
         uint256 mySharesLength = (150 - 2 * bytes(mySharesStr).length);
+        string memory topTag = "MY SHARES";
+        if (claimTokenAddress != address(0)) {
+            topTag = "MY CLAIMS";
+        }
         svg = string(
             abi.encodePacked(
                 '<rect x="20" y="400" width="321" height="75" rx="12" fill="url(#paint5_linear_1634_41705)" fill-opacity=".45"/><path fill-rule="evenodd" clip-rule="evenodd" d="M22 463v-51c0-5.523 4.477-10 10-10h80v-2H32c-6.627 0-12 5.373-12 12v51c0 6.627 5.373 12 12 12h298c6.627 0 12-5.373 12-12v-51c0-6.627-5.373-12-12-12h-79v2h79c5.523 0 10 4.477 10 10v51c0 5.523-4.477 10-10 10H32c-5.523 0-10-4.477-10-10z" fill="url(#paint6_linear_1634_41705)"/><text fill="#fff" style="white-space:pre" font-family="Poppins" font-size="20" font-weight="600" letter-spacing="0"><tspan x="',
                 mySharesLength.toString(),
                 '" y="445">',
                 mySharesStr,
-                '</tspan></text><text opacity="0.5" fill="white" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="14" letter-spacing="0.005em"><tspan x="142" y="405.591">MY SHARES</tspan></text>'
+                '</tspan></text><text opacity="0.5" fill="white" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="14" letter-spacing="0.005em"><tspan x="142" y="405.591">',
+                topTag,
+                '</tspan></text>'
             )
         );
     }
