@@ -59,14 +59,16 @@ contract ManagerCaller is Script {
         // address[] memory tos = new address[](1);
         // tos[0] = 0xD8435B576d5f0AC080f475d7CF8d9f959daf8069;
         // p.mintBatch(tos);
-        OneSeedDaoArena arena = OneSeedDaoArena(payable(0x10D5929415B6A2C7DF537167e0c73a73ba3fB3b9));
+        OneSeedDaoArena arena = OneSeedDaoArena(payable(0x6F9675D556fc23ae2ecb47A125B987AcCdf39456));
         // MockERC20 t = new MockERC20("TEST", "T", 18);
         // t.mint(0x817016163775AaF0B25DF274fB4b18edB67E1F26, 10000 * 1e18);
         // arena.setInvestmentCollateral(address(0x79547dcF4eb6fE713d48a2E3E728DA990f5Dda43), address(t), 1000 * 1e18);
         // t.transfer(0x10D5929415B6A2C7DF537167e0c73a73ba3fB3b9, 1000 * 1e18);
         // arena.investmentDistribute(0x79547dcF4eb6fE713d48a2E3E728DA990f5Dda43, 100 * 1e18);
-        NFTDescriptor nftDescriptor = new NFTDescriptor(address(new NFTSVG()));
-        arena.setTokenURIAddr(address(nftDescriptor));
+        // NFTDescriptor nftDescriptor = new NFTDescriptor(address(new NFTSVG()));
+        // arena.setTokenURIAddr(address(nftDescriptor));
+        Investment invest = new Investment();
+        arena.setArgs(address(invest), 500, 0x698203F51149cd4314231247525f3eD4BAAa11B7);
         vm.stopBroadcast();
     }
 }

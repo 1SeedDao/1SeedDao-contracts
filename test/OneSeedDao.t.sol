@@ -92,10 +92,11 @@ contract OneSeedDaoTest is Test {
     function testUSDTInvestFailAndRefund() public {
         address sender = randomSelectSender(0);
         usdt.approve(address(arena), type(uint256).max);
-        arena.invest(address(usdtInvestment), 1000 * 1e6);
+        arena.invest(address(usdtInvestment), MIN_FINANCING_AMOUNT-1);
         // skip the timestamp
+        
         skip(11);
-        // usdtInvestment.submitResult(1);
+        usdtInvestment.submitResult(1);
         usdtInvestment.refund();
         assertEq(MINT_AMOUNT, usdt.balanceOf(sender));
     }

@@ -8,12 +8,13 @@ import {IInvestActions, IInvestState} from "self/interfaces/IInvestState.sol";
 import "self/interfaces/IOneSeedDaoArena.sol";
 import "@oc/token/ERC20/IERC20.sol";
 import "@oc/token/ERC721/extensions/IERC721Enumerable.sol";
+import "@oc/security/ReentrancyGuard.sol";
 import "@oc/utils/structs/EnumerableMap.sol";
 import "@ocu/access/OwnableUpgradeable.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
-contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestState, IInvestCollateral {
+contract Investment is OwnableUpgradeable,ReentrancyGuard, IInvestInit, IInvestActions, IInvestState, IInvestCollateral {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using EnumerableMap for EnumerableMap.UintToUintMap;
 
@@ -64,9 +65,9 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
      * @dev Submit the result of an investment
      * @param _mintBatch The number of tokens to mint
      */
-    function submitResult(uint256 _mintBatch) external {
+    function submitResult(uint256 _mintBatch) external nonReentrant {
         InvestmentKey memory key = cip.key;
-        if (isInvestFailed) {
+        if (isInvestFailed || _mintBatch == 0) {
             revert Errors.SubmitFailed();
         }
         uint256 normalFinancingAmount = (key.minFinancingAmount + key.maxFinancingAmount) / 2;
@@ -74,9 +75,16 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
             if (block.timestamp <= endTs) {
                 revert Errors.NotNeedChange();
             }
-            isInvestFailed = true;
-            emit InvestStatus(false, key.financingWallet, 0, 0);
-            return;
+            // if the investment is not successful, the investment will be refunded
+            if (investTotalAmount < key.minFinancingAmount) {
+                isInvestFailed = true;
+                emit InvestStatus(false, key.financingWallet, 0, 0);
+                return;
+            }
+        }
+
+        if (msg.sender != key.financingWallet && block.timestamp <= endTs) {
+            revert Errors.SubmitFailed();
         }
         uint256 l = _infos.length() > _mintBatch ? _mintBatch : _infos.length();
         for (uint256 i; i < l; i++) {
@@ -125,7 +133,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
      * @dev Claims returns on a batch of investments
      * @param ids Array of token IDs for which returns should be claimed
      */
-    function claimBatch(uint256[] calldata ids) external {
+    function claimBatch(uint256[] calldata ids) external nonReentrant {
         for (uint256 i; i < ids.length; i++) {
             _claim(ids[i]);
         }
@@ -295,7 +303,7 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
      * It also removes the investor's information from the investment records.
      */
 
-    function refund() external {
+    function refund() external nonReentrant {
         InvestmentKey memory key = cip.key;
         uint256 refundAmount = _infos.get(msg.sender);
         if (!isInvestFailed && investTotalAmount < key.minFinancingAmount) {
@@ -370,7 +378,6 @@ contract Investment is OwnableUpgradeable, IInvestInit, IInvestActions, IInvestS
      * @dev Distributes the collateral, 1.line distrubution 2. cliff distribution
      * @param amount The amount of collateral to be distributed
      */
-
     function collateralDistribute(uint256 amount) public onlyArena {
         round++;
         collateralTokenRoundPools[round] = amount;
