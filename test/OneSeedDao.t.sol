@@ -42,8 +42,9 @@ contract OneSeedDaoTest is Test {
 
         (address admin, uint256 _privateKey) = deriveRememberKey(mnemonic, 10000);
         privateKey = _privateKey;
-
-        arena = new OneSeedDaoArena(address(new Investment()), 100, admin);
+        Investment i = new Investment();
+        i.submitResult(100);
+        arena = new OneSeedDaoArena(address(i), 100, admin);
         address[] memory tokens = new address[](2);
         tokens[0] = (address(0));
         tokens[1] = (address(usdt));
@@ -92,10 +93,11 @@ contract OneSeedDaoTest is Test {
     function testUSDTInvestFailAndRefund() public {
         address sender = randomSelectSender(0);
         usdt.approve(address(arena), type(uint256).max);
-        arena.invest(address(usdtInvestment), 1000 * 1e6);
+        arena.invest(address(usdtInvestment), MIN_FINANCING_AMOUNT-1);
         // skip the timestamp
+        
         skip(11);
-        // usdtInvestment.submitResult(1);
+        usdtInvestment.submitResult(1);
         usdtInvestment.refund();
         assertEq(MINT_AMOUNT, usdt.balanceOf(sender));
     }

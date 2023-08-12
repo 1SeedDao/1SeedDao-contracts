@@ -143,7 +143,7 @@ contract OneSeedDaoArena is IOneSeedDaoArena, Pausable, AccessControl, Ownable, 
         InvestmentKey memory key = IInvestState(investmentAddr).investmentKey();
         uint256 amount;
         if (key.collateralToken != address(0)) {
-            IERC20(key.collateralToken).transferFrom(msg.sender, investmentAddr, investAmount);
+            require(IERC20(key.collateralToken).transferFrom(msg.sender, investmentAddr, investAmount), "1NVEST: transfer amount exceeds balance");
             amount = investAmount;
         } else {
             payable(investmentAddr).transfer(msg.value);
